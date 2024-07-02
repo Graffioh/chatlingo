@@ -1,0 +1,17 @@
+*** spiegazione traccia ***
+
+- vocabolario tramite hashmap/json (tempo di ricerca O(1))
+- traduzione solo da italiano a inglese e non viceversa?
+- registrazione utente tramite file di testo
+- l'utente avrà username, password e lingua
++ stanze create tramite concorrenza/thread?
+- 2 stanze (per iniziare) una inglese una italiano
+- ogni stanza al massimo un numero K di utenti connessi per volta
+- utenti aggiunti alla stanza tramite FIFO
++ utenti inattivi cacciati dalla stanza dopo E secondi
+OPZIONALE: stanze create dagli utenti
+
+server = vocabolario, stanze, gestione utenti
+client = utenti
+
+*****************************
