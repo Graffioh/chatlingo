@@ -15,3 +15,5 @@ server = vocabolario, stanze, gestione utenti
 client = utenti
 
 *****************************
+
+HASH TABLE IN C: https://github.com/jamesroutley/write-a-hash-table
