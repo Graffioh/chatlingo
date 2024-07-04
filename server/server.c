@@ -15,12 +15,13 @@
 
 int server_fd;
 
-void sigint_handler(int sig) {
+void server_shutdown_handler(int sig) {
   printf("\nShutting down server...\n");
   close(server_fd);
   exit(0);
 }
 
+// Converts a txt file into an hash table
 ht_hash_table *ht_setup_from_txt(FILE *txt) {
   char line[MAX_LENGTH];
   char *first_word, *second_word;
@@ -60,7 +61,7 @@ int main() {
   server_addr.sin_addr.s_addr = INADDR_ANY;
   server_addr.sin_port = htons(PORT);
 
-  signal(SIGINT, sigint_handler);
+  signal(SIGINT, server_shutdown_handler);
 
   // Bind the socket to the address
   if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) <
@@ -104,8 +105,12 @@ int main() {
     while (1) {
       // Receive data from client
       int bytes_received = recv(new_socket, buffer, BUFSIZE, 0);
-      if (bytes_received < 0) {
-        perror("recv failed");
+      if (bytes_received <= 0) {
+        if (bytes_received == 0) {
+          printf("Client: %s disconnected\n", client_ip);
+        } else {
+          perror("recv failed");
+        }
         break;
       }
 
@@ -114,6 +119,8 @@ int main() {
 
       if ((translated_str = ht_search(ht, buffer))) {
         printf("Translation: %s\n", translated_str);
+      } else {
+        translated_str = buffer;
       }
 
       // Send a response back to the client
@@ -121,8 +128,7 @@ int main() {
       send(new_socket, response, strlen(response), 0);
 
       if (strcmp(buffer, "/ciao") == 0) {
-        printf("Client requested to close the connection.\n");
-        printf("Connection closing...\n");
+        printf("Client: %s requested to close the connection.\n", client_ip);
         break;
       }
     }

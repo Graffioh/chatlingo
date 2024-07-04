@@ -13,8 +13,8 @@
 int main() {
   int sockfd;
   struct sockaddr_in server_addr;
-  char buffer[BUFSIZE];
-  char message[BUFSIZE];
+  char server_response_buffer[BUFSIZE];
+  char message_buffer[BUFSIZE];
 
   // Create socket
   if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -41,28 +41,29 @@ int main() {
   while (1) {
     // Get user input
     printf("Enter message: ");
-    fgets(message, BUFSIZE, stdin);
+    fgets(message_buffer, BUFSIZE, stdin);
 
     // Remove newline character
-    message[strcspn(message, "\n")] = 0;
+    message_buffer[strcspn(message_buffer, "\n")] = 0;
 
     // Send message to server
-    send(sockfd, message, strlen(message), 0);
+    send(sockfd, message_buffer, strlen(message_buffer), 0);
 
-    if (strcmp(message, "/ciao") == 0) {
+    // When /ciao is sent, exit
+    if (strcmp(message_buffer, "/ciao") == 0) {
       printf("Exiting...\n");
       break;
     }
 
     // Receive response from server
-    int num_bytes_received = recv(sockfd, buffer, BUFSIZE, 0);
+    int num_bytes_received = recv(sockfd, server_response_buffer, BUFSIZE, 0);
     if (num_bytes_received < 0) {
       perror("recv failed");
       continue;
     }
 
-    buffer[num_bytes_received] = '\0';
-    printf("Server response: %s\n", buffer);
+    server_response_buffer[num_bytes_received] = '\0';
+    printf("Server response: %s\n", server_response_buffer);
   }
 
   close(sockfd);
