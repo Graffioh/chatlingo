@@ -14,6 +14,8 @@ OPZIONALE: stanze create dagli utenti
 server = vocabolario, stanze, gestione utenti
 client = utenti
 
+USARE DOCKER COMPOSE
+
 *****************************
 
 HASH TABLE IN C: https://github.com/jamesroutley/write-a-hash-table
