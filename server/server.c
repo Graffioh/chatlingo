@@ -7,6 +7,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "../hash_table/hash_table.h"
+
 #define PORT 8080
 #define BUFSIZE 1024
 #define MAX_LENGTH 1000
@@ -17,6 +19,28 @@ void sigint_handler(int sig) {
   printf("\nShutting down server...\n");
   close(server_fd);
   exit(0);
+}
+
+ht_hash_table *ht_setup_from_txt(FILE *txt) {
+  char line[MAX_LENGTH];
+  char *first_word, *second_word;
+  ht_hash_table *ht = ht_new();
+
+  while (fgets(line, MAX_LENGTH, txt) != NULL) {
+    line[strcspn(line, "\n")] = 0;
+
+    first_word = strtok(line, ",");
+    if (first_word != NULL) {
+      second_word = strtok(NULL, ",");
+      if (second_word != NULL) {
+        ht_insert(ht, first_word, second_word);
+      }
+    }
+  }
+
+  fclose(txt);
+
+  return ht;
 }
 
 int main() {
@@ -53,38 +77,16 @@ int main() {
 
   printf("TCP Server is listening on port %d...\n", PORT);
 
-  // Vocab setup
+  // Vocab setup from txt to hash table for O(1) search
   //
-  // Read from vocab.txt
-  // FILE *file = fopen("vocab.txt", "r");
-  // if (file == NULL) {
-  //     printf("Error opening file.\n");
-  //     return 1;
-  // }
+  FILE *file = fopen("./server/vocab.txt", "r");
+  if (file == NULL) {
+    perror("Error opening file: %s");
+    return -1;
+  }
+  ht_hash_table *ht = ht_setup_from_txt(file);
 
-  // char line[MAX_LENGTH];
-  // char *first_word, *second_word;
-  // while (fgets(line, MAX_LENGTH, file) != NULL) {
-  //     // if(parola colonna 1 == parola in messaggio) {
-  //     //     print parola colonna 2
-  //     // }
-
-  //     // Remove newline character if present
-  //     line[strcspn(line, "\n")] = 0;
-
-  //     // Get the first word
-  //     first_word = strtok(line, ",");
-  //     if (first_word != NULL) {
-  //         // Get the second word
-  //         second_word = strtok(NULL, ",");
-  //         if (second_word != NULL) {
-  //             printf("%s \n", second_word);
-  //         }
-  //     }
-  // }
-
-  // fclose(file);
-
+  char *translated_str = {0};
   while (1) {
     // Accept a new connection
     if ((new_socket = accept(server_fd, (struct sockaddr *)&client_addr,
@@ -110,41 +112,17 @@ int main() {
       buffer[bytes_received] = '\0';
       printf("Received from client: %s\n", buffer);
 
-      FILE *file = fopen("vocab.txt", "r");
-      if (file == NULL) {
-        printf("Error opening file.\n");
-        return 1;
+      if ((translated_str = ht_search(ht, buffer))) {
+        printf("Translation: %s\n", translated_str);
       }
-
-      char line[MAX_LENGTH];
-      char *first_word, *second_word;
-      while (fgets(line, MAX_LENGTH, file) != NULL) {
-        // Remove newline character if present
-        line[strcspn(line, "\n")] = 0;
-
-        printf("YOOOO");
-
-        // Get the first word
-        first_word = strtok(line, ",");
-        if (first_word != NULL) {
-          // Get the second word
-          second_word = strtok(NULL, ",");
-          if (second_word != NULL) {
-            if (buffer == first_word) {
-              printf("%s \n", second_word);
-            }
-          }
-        }
-      }
-
-      fclose(file);
 
       // Send a response back to the client
-      const char *response = "Message received!";
+      const char *response = translated_str;
       send(new_socket, response, strlen(response), 0);
 
       if (strcmp(buffer, "/ciao") == 0) {
         printf("Client requested to close the connection.\n");
+        printf("Connection closing...\n");
         break;
       }
     }

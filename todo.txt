@@ -18,4 +18,5 @@ USARE DOCKER COMPOSE
 
 *****************************
 
-HASH TABLE IN C: https://github.com/jamesroutley/write-a-hash-table
+*** BUGS ***
+- quando il client esce crasha anche il server
