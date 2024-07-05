@@ -52,5 +52,5 @@ Mkfile.old
 dkms.conf
 
 todo.txt
-./s
-./c
+./server/s
+./client/c
