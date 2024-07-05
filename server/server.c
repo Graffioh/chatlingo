@@ -21,8 +21,7 @@ void server_shutdown_handler(int sig) {
   exit(0);
 }
 
-// Converts a txt file into an hash table
-ht_hash_table *ht_setup_from_txt(FILE *txt) {
+ht_hash_table *ht_setup_english_to_italian_from_txt(FILE *txt) {
   char line[MAX_LENGTH];
   char *first_word, *second_word;
   ht_hash_table *ht = ht_new();
@@ -39,7 +38,25 @@ ht_hash_table *ht_setup_from_txt(FILE *txt) {
     }
   }
 
-  fclose(txt);
+  return ht;
+}
+
+ht_hash_table *ht_setup_italian_to_english_from_txt(FILE *txt) {
+  char line[MAX_LENGTH];
+  char *first_word, *second_word;
+  ht_hash_table *ht = ht_new();
+
+  while (fgets(line, MAX_LENGTH, txt) != NULL) {
+    line[strcspn(line, "\n")] = 0;
+
+    first_word = strtok(line, ",");
+    if (first_word != NULL) {
+      second_word = strtok(NULL, ",");
+      if (second_word != NULL) {
+        ht_insert(ht, second_word, first_word);
+      }
+    }
+  }
 
   return ht;
 }
@@ -85,9 +102,18 @@ int main() {
     perror("Error opening file: %s");
     return -1;
   }
-  ht_hash_table *ht = ht_setup_from_txt(file);
 
-  char *translated_str = {0};
+  ht_hash_table *ht_english_to_italian =
+      ht_setup_english_to_italian_from_txt(file);
+
+  rewind(file);
+
+  ht_hash_table *ht_italian_to_english =
+      ht_setup_italian_to_english_from_txt(file);
+
+  fclose(file);
+
+  char *translated_str = NULL;
   while (1) {
     // Accept a new connection
     if ((new_socket = accept(server_fd, (struct sockaddr *)&client_addr,
@@ -115,10 +141,13 @@ int main() {
       }
 
       buffer[bytes_received] = '\0';
-      printf("Received from client: %s\n", buffer);
+      printf("Received from client %s: %s\n", client_ip, buffer);
 
-      if ((translated_str = ht_search(ht, buffer))) {
-        printf("Translation: %s\n", translated_str);
+      // Translate the string or give the old string if no translation is found
+      if ((translated_str = ht_search(ht_english_to_italian, buffer))) {
+        printf("Translation english -> italian: %s\n", translated_str);
+      } else if ((translated_str = ht_search(ht_italian_to_english, buffer))) {
+        printf("Translation italian -> english: %s\n", translated_str);
       } else {
         translated_str = buffer;
       }
@@ -136,6 +165,8 @@ int main() {
     close(new_socket);
   }
 
+  ht_del_hash_table(ht_english_to_italian);
+  ht_del_hash_table(ht_italian_to_english);
   close(server_fd);
   return 0;
 }
