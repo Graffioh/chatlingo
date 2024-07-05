@@ -22,7 +22,8 @@ USARE DOCKER COMPOSE
 *** TODO ***
 
 [x] vocabolario + hash table
-[] conversione stringa in array di parole (marco)
+[] conversione lettere della stringa in maiuscolo/minuscolo
+[] conversione stringa in array di parole
 [] 2 stanze con threads (Inglese-Italiano e Italiano-Inglese)
 [] registrazione utente
 [] decidere come fare più utenti (se sempre con threads o altro)

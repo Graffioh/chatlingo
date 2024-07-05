@@ -7,7 +7,8 @@
 #include <unistd.h>
 
 #define SERVER_IP "127.0.0.1"
-#define PORT 8080
+#define PORT_ENGLISH_TO_ITALIAN 8080
+#define PORT_ITALIAN_TO_ENGLISH 6969
 #define BUFSIZE 1024
 
 int main() {
@@ -15,6 +16,17 @@ int main() {
   struct sockaddr_in server_addr;
   char server_response_buffer[BUFSIZE];
   char message_buffer[BUFSIZE];
+  int room_choice;
+
+  // Ask user to choose a room
+  do {
+    printf("Choose a room:\n");
+    printf("1. English to Italian\n");
+    printf("2. Italian to English\n");
+    printf("Enter your choice (1 or 2): ");
+    scanf("%d", &room_choice);
+    getchar();
+  } while (room_choice != 1 && room_choice != 2);
 
   // Create socket
   if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -25,7 +37,8 @@ int main() {
   // Set server address
   memset(&server_addr, 0, sizeof(server_addr));
   server_addr.sin_family = AF_INET;
-  server_addr.sin_port = htons(PORT);
+  server_addr.sin_port = htons(room_choice == 1 ? PORT_ENGLISH_TO_ITALIAN
+                                                : PORT_ITALIAN_TO_ENGLISH);
   if (inet_pton(AF_INET, SERVER_IP, &server_addr.sin_addr) <= 0) {
     perror("inet_pton failed");
     exit(EXIT_FAILURE);
@@ -37,6 +50,9 @@ int main() {
     perror("connect failed");
     exit(EXIT_FAILURE);
   }
+
+  printf("Connected to %s room\n",
+         room_choice == 1 ? "English to Italian" : "Italian to English");
 
   while (1) {
     // Get user input

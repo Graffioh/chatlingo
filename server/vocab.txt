@@ -124,8 +124,8 @@ Meat,Carne
 Cheese,Formaggio
 Wine,Vino
 Beer,Birra
-Coffee,Caffè
-Tea,Tè
+Coffee,Caffe
+Tea,Te
 Music,Musica
 Book,Libro
 Movie,Film
