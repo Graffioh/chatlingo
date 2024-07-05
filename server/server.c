@@ -67,7 +67,7 @@ void *room_english_to_italian(void *arg) {
 
   ht_hash_table *ht_english_to_italian = v->english_to_italian;
 
-  int new_socket;
+  int client_socket;
   struct sockaddr_in client_addr;
   socklen_t addr_len = sizeof(client_addr);
   char buffer[BUFSIZE];
@@ -76,8 +76,9 @@ void *room_english_to_italian(void *arg) {
 
   while (1) {
     // Accept a new connection
-    if ((new_socket = accept(server_fd_english_to_italian,
-                             (struct sockaddr *)&client_addr, &addr_len)) < 0) {
+    if ((client_socket = accept(server_fd_english_to_italian,
+                                (struct sockaddr *)&client_addr, &addr_len)) <
+        0) {
       perror("accept failed");
       continue;
     }
@@ -90,7 +91,7 @@ void *room_english_to_italian(void *arg) {
 
     while (1) {
       // Receive data from client
-      int bytes_received = recv(new_socket, buffer, BUFSIZE, 0);
+      int bytes_received = recv(client_socket, buffer, BUFSIZE, 0);
       if (bytes_received <= 0) {
         if (bytes_received == 0) {
           printf("Client: %s disconnected\n", client_ip);
@@ -112,15 +113,15 @@ void *room_english_to_italian(void *arg) {
 
       // Send a response back to the client
       const char *response = translated_str;
-      send(new_socket, response, strlen(response), 0);
+      send(client_socket, response, strlen(response), 0);
 
-      if (strcmp(buffer, "/ciao") == 0) {
+      if (strcmp(buffer, "/ciao") == 0 || strcmp(buffer, "/exit") == 0) {
         printf("Client: %s requested to close the connection.\n", client_ip);
         break;
       }
     }
 
-    close(new_socket);
+    close(client_socket);
   }
 
   return NULL;
@@ -131,7 +132,7 @@ void *room_italian_to_english(void *arg) {
 
   ht_hash_table *ht_italian_to_english = v->italian_to_english;
 
-  int new_socket;
+  int client_socket;
   struct sockaddr_in client_addr;
   socklen_t addr_len = sizeof(client_addr);
   char buffer[BUFSIZE];
@@ -140,8 +141,9 @@ void *room_italian_to_english(void *arg) {
 
   while (1) {
     // Accept a new connection
-    if ((new_socket = accept(server_fs_italian_to_english,
-                             (struct sockaddr *)&client_addr, &addr_len)) < 0) {
+    if ((client_socket = accept(server_fs_italian_to_english,
+                                (struct sockaddr *)&client_addr, &addr_len)) <
+        0) {
       perror("accept failed");
       continue;
     }
@@ -154,7 +156,7 @@ void *room_italian_to_english(void *arg) {
 
     while (1) {
       // Receive data from client
-      int bytes_received = recv(new_socket, buffer, BUFSIZE, 0);
+      int bytes_received = recv(client_socket, buffer, BUFSIZE, 0);
       if (bytes_received <= 0) {
         if (bytes_received == 0) {
           printf("Client: %s disconnected\n", client_ip);
@@ -176,15 +178,15 @@ void *room_italian_to_english(void *arg) {
 
       // Send a response back to the client
       const char *response = translated_str;
-      send(new_socket, response, strlen(response), 0);
+      send(client_socket, response, strlen(response), 0);
 
-      if (strcmp(buffer, "/ciao") == 0) {
+      if (strcmp(buffer, "/ciao") == 0 || strcmp(buffer, "/exit") == 0) {
         printf("Client: %s requested to close the connection.\n", client_ip);
         break;
       }
     }
 
-    close(new_socket);
+    close(client_socket);
   }
 
   return NULL;

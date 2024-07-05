@@ -22,21 +22,21 @@ USARE DOCKER COMPOSE
 *** TODO ***
 
 [x] vocabolario + hash table
-[] conversione lettere della stringa in maiuscolo/minuscolo
-[] conversione stringa in array di parole
-[] 2 stanze con threads (Inglese-Italiano e Italiano-Inglese)
+[x] 2 stanze con threads (Inglese-Italiano e Italiano-Inglese)
+[] uscita e cambio stanza
 [] registrazione utente
 [] decidere come fare più utenti (se sempre con threads o altro)
 [] limitare accesso alle rooms per massimo k utenti
 [] utenti messi in attesa per poi essere aggiunti tramite FIFO
 [] utenti inattivi cacciati dopo E secondi
+[] conversione lettere della stringa in maiuscolo/minuscolo
+[] conversione stringa in array di parole
 [] setup docker compose
 
 *****************************
 
 *** BUGS ***
 
--
-
+[] send in server.c quando /ciao fa crashare
 
 *****************************
