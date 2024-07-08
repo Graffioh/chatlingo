@@ -1,6 +1,7 @@
 // linux socket explanation: https://www.youtube.com/watch?v=XXfdzwEsxFk
 
 #include <arpa/inet.h>
+#include <ctype.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <signal.h>
@@ -28,6 +29,36 @@ void server_shutdown_handler(int sig) {
   close(server_fd_english_to_italian);
   close(server_fs_italian_to_english);
   exit(0);
+}
+
+void first_letter_uppercase(char *str) { str[0] = toupper(str[0]); }
+
+char *translate_phrase(ht_hash_table *dictionary, char *phrase) {
+  char *result = malloc(BUFSIZE);
+  result[0] = '\0';
+  char *word = strtok(phrase, " ");
+
+  while (word != NULL) {
+
+    first_letter_uppercase(word);
+
+    char *translated = ht_search(dictionary, word);
+    if (translated == NULL) {
+      translated = word;
+    }
+
+    strcat(result, translated);
+    strcat(result, " ");
+
+    word = strtok(NULL, " ");
+  }
+
+  size_t len = strlen(result);
+  if (len > 0 && result[len - 1] == ' ') {
+    result[len - 1] = '\0';
+  }
+
+  return result;
 }
 
 vocab *vocab_setup_from_txt() {
@@ -110,18 +141,13 @@ void *room_english_to_italian(void *arg) {
         message_without_user += 2;
       }
 
-      // Translate the string or give the old string if no translation is found
-      if ((translated_str =
-               ht_search(ht_english_to_italian, message_without_user))) {
-        printf("Translation english -> italian: %s\n", translated_str);
-      } else {
-        translated_str = message_without_user;
-        printf("Translation not found: %s\n", translated_str);
-      }
+      // Translate the phrase
+      char *translated_phrase =
+          translate_phrase(ht_english_to_italian, message_without_user);
+      printf("Translation italian -> english: %s\n", translated_phrase);
 
-      // Send a response back to the client
-      const char *response = translated_str;
-      send(client_socket, response, strlen(response), 0);
+      send(client_socket, translated_phrase, strlen(translated_phrase), 0);
+      free(translated_phrase);
 
       if (strcmp(message_without_user, "/ciao") == 0 ||
           strcmp(message_without_user, "/exit") == 0) {
@@ -184,18 +210,12 @@ void *room_italian_to_english(void *arg) {
         message_without_user += 2;
       }
 
-      // Translate the string or give the old string if no translation is found
-      if ((translated_str =
-               ht_search(ht_italian_to_english, message_without_user))) {
-        printf("Translation italian -> english: %s\n", translated_str);
-      } else {
-        translated_str = message_without_user;
-        printf("Translation not found: %s\n", translated_str);
-      }
+      char *translated_phrase =
+          translate_phrase(ht_italian_to_english, message_without_user);
+      printf("Translation italian -> english: %s\n", translated_phrase);
 
-      // Send a response back to the client
-      const char *response = translated_str;
-      send(client_socket, response, strlen(response), 0);
+      send(client_socket, translated_phrase, strlen(translated_phrase), 0);
+      free(translated_phrase);
 
       if (strcmp(message_without_user, "/ciao") == 0 ||
           strcmp(message_without_user, "/exit") == 0) {
