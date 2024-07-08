@@ -4,6 +4,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "../auth/user_auth.h"
+
 #define SERVER_IP "127.0.0.1"
 #define PORT_ENGLISH_TO_ITALIAN 8080
 #define PORT_ITALIAN_TO_ENGLISH 6969
@@ -57,6 +59,106 @@ int choose_room() {
   return room_choice;
 }
 
+void initialize_user(user *user, const char *username, const char *password,
+                     const char *language) {
+  strncpy(user->username, username, MAX_USERNAME_LENGTH);
+  user->username[MAX_USERNAME_LENGTH - 1] = '\0';
+
+  strncpy(user->password, password, MAX_PASSWORD_LENGTH);
+  user->password[MAX_PASSWORD_LENGTH - 1] = '\0';
+
+  strncpy(user->language, language, MAX_LANGUAGE_LENGTH);
+  user->language[MAX_LANGUAGE_LENGTH - 1] = '\0';
+}
+
+user *registration_phase() {
+  char username[MAX_USERNAME_LENGTH], password[MAX_PASSWORD_LENGTH],
+      language[MAX_LANGUAGE_LENGTH];
+  bool registration_check = 0;
+  user *user = NULL;
+
+  printf("--- Hello! Welcome to Chatlingo, register here ---");
+
+  do {
+    printf("\nUsername: ");
+    scanf("%s", username);
+    printf("\nPassword: ");
+    scanf("%s", password);
+    printf("\nLanguage: ");
+    scanf("%s", language);
+
+    registration_check = register_user(username, password, language);
+
+    if (registration_check == 0) {
+      printf("Username already exists, try again.\n");
+    } else {
+      printf("Welcome, you are now registered!\n");
+
+      user = malloc(sizeof(*user));
+      if (user == NULL) {
+        fprintf(stderr, "User registration memory allocation failed\n");
+        return NULL;
+      }
+
+      initialize_user(user, username, password, language);
+    }
+  } while (registration_check == 0);
+
+  return user;
+}
+
+user *login_phase() {
+  char username[MAX_USERNAME_LENGTH], password[MAX_PASSWORD_LENGTH],
+      language[MAX_LANGUAGE_LENGTH];
+  int login_choice = 0;
+  user *user = NULL;
+
+  printf("--- LOGIN ---");
+
+  do {
+    printf("\nUsername: ");
+    scanf("%s", username);
+    printf("\nPassword: ");
+    scanf("%s", password);
+
+    user = login(username, password);
+
+    if (user == NULL) {
+      printf("User not present in the database, you need to register.\n");
+      printf("Do you want try again (1) or you want to register (2)? ");
+      scanf("%d", &login_choice);
+
+      switch (login_choice) {
+      case 1:
+        printf("Moving you to login...");
+        break;
+
+      case 2:
+        user = registration_phase();
+        break;
+
+      default:
+        printf("Wrong choice!\n");
+        login_choice = 1;
+        break;
+      }
+
+    } else {
+      printf("Welcome, you are now logged in!\n");
+
+      user = malloc(sizeof(*user));
+      if (user == NULL) {
+        fprintf(stderr, "Memory allocation failed\n");
+        return NULL;
+      }
+
+      initialize_user(user, username, password, language);
+    }
+  } while (login_choice == 1);
+
+  return user;
+}
+
 int main() {
   int sockfd;
   char server_response_buffer[BUFSIZE];
@@ -64,6 +166,38 @@ int main() {
   int room_choice;
 
   while (1) {
+    // Authentication
+    //
+    user *user = NULL;
+    int login_or_registration = 0;
+
+    printf("--- Welcome to Chatlingo, do you want to login (1) or register "
+           "(2)? Make your choice and enjoy your time here! ---\n");
+
+    do {
+      scanf("%d", &login_or_registration);
+
+      switch (login_or_registration) {
+      case 1:
+        // Login
+        //
+        user = login_phase();
+        break;
+
+      case 2:
+        // Registration
+        //
+        user = registration_phase();
+        break;
+
+      default:
+        printf("Wrong choice, please try again!\n");
+        break;
+      }
+    } while (login_or_registration != 1 && login_or_registration != 2);
+
+    // Room choice
+    //
     room_choice = choose_room();
     sockfd = connect_to_server(room_choice);
 
@@ -72,14 +206,27 @@ int main() {
       continue;
     }
 
+    // Inside the room
+    //
     while (1) {
       // Get user input
+      int username_length = strlen(user->username);
+      char message_with_user[BUFSIZE + username_length + 4];
+
       printf("Enter message: ");
-      fgets(message_buffer, BUFSIZE, stdin);
-      message_buffer[strcspn(message_buffer, "\n")] = 0; // Remove newline
+      if (fgets(message_buffer, BUFSIZE, stdin) != NULL) {
+        snprintf(message_with_user, sizeof(message_with_user), "%s: %s",
+                 user->username, message_buffer);
+
+        message_with_user[strcspn(message_with_user, "\n")] = '\0';
+        message_buffer[strcspn(message_buffer, "\n")] = '\0';
+      } else {
+        perror("Error reading input");
+        break;
+      }
 
       // Send message to server
-      if (send(sockfd, message_buffer, strlen(message_buffer), 0) < 0) {
+      if (send(sockfd, message_with_user, strlen(message_with_user), 0) < 0) {
         perror("send failed");
         break;
       }

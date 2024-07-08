@@ -104,18 +104,26 @@ void *room_english_to_italian(void *arg) {
       buffer[bytes_received] = '\0';
       printf("Received from client %s: %s\n", client_ip, buffer);
 
+      // Remove the user: and read only the message
+      char *message_without_user = strchr(buffer, ':');
+      if (message_without_user != NULL) {
+        message_without_user += 2;
+      }
+
       // Translate the string or give the old string if no translation is found
-      if ((translated_str = ht_search(ht_english_to_italian, buffer))) {
+      if ((translated_str =
+               ht_search(ht_english_to_italian, message_without_user))) {
         printf("Translation english -> italian: %s\n", translated_str);
       } else {
-        translated_str = buffer;
+        translated_str = message_without_user;
       }
 
       // Send a response back to the client
       const char *response = translated_str;
       send(client_socket, response, strlen(response), 0);
 
-      if (strcmp(buffer, "/ciao") == 0 || strcmp(buffer, "/exit") == 0) {
+      if (strcmp(message_without_user, "/ciao") == 0 ||
+          strcmp(message_without_user, "/exit") == 0) {
         printf("Client: %s requested to close the connection.\n", client_ip);
         break;
       }
@@ -169,18 +177,26 @@ void *room_italian_to_english(void *arg) {
       buffer[bytes_received] = '\0';
       printf("Received from client %s: %s\n", client_ip, buffer);
 
+      // Remove the user: and read only the message
+      char *message_without_user = strchr(buffer, ':');
+      if (message_without_user != NULL) {
+        message_without_user += 2;
+      }
+
       // Translate the string or give the old string if no translation is found
-      if ((translated_str = ht_search(ht_italian_to_english, buffer))) {
+      if ((translated_str =
+               ht_search(ht_italian_to_english, message_without_user))) {
         printf("Translation italian -> english: %s\n", translated_str);
       } else {
-        translated_str = buffer;
+        translated_str = message_without_user;
       }
 
       // Send a response back to the client
       const char *response = translated_str;
       send(client_socket, response, strlen(response), 0);
 
-      if (strcmp(buffer, "/ciao") == 0 || strcmp(buffer, "/exit") == 0) {
+      if (strcmp(message_without_user, "/ciao") == 0 ||
+          strcmp(message_without_user, "/exit") == 0) {
         printf("Client: %s requested to close the connection.\n", client_ip);
         break;
       }
