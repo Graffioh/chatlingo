@@ -77,14 +77,14 @@ user *registration_phase() {
   bool registration_check = 0;
   user *user = NULL;
 
-  printf("--- Hello! Welcome to Chatlingo, register here ---");
+  printf("--- Hello! Welcome to Chatlingo, register here ---\n");
 
   do {
-    printf("\nUsername: ");
+    printf("Username: ");
     scanf("%s", username);
-    printf("\nPassword: ");
+    printf("Password: ");
     scanf("%s", password);
-    printf("\nLanguage: ");
+    printf("Language: ");
     scanf("%s", language);
 
     registration_check = register_user(username, password, language);
@@ -93,6 +93,7 @@ user *registration_phase() {
       printf("Username already exists, try again.\n");
     } else {
       printf("Welcome, you are now registered!\n");
+      printf("Redirecting you to room selection...\n");
 
       user = malloc(sizeof(*user));
       if (user == NULL) {
@@ -101,6 +102,9 @@ user *registration_phase() {
       }
 
       initialize_user(user, username, password, language);
+
+      sleep(1);
+      system("clear");
     }
   } while (registration_check == 0);
 
@@ -113,12 +117,12 @@ user *login_phase() {
   int login_choice = 0;
   user *user = NULL;
 
-  printf("--- LOGIN ---");
+  printf("--- LOGIN ---\n");
 
   do {
-    printf("\nUsername: ");
+    printf("Username: ");
     scanf("%s", username);
-    printf("\nPassword: ");
+    printf("Password: ");
     scanf("%s", password);
 
     user = login(username, password);
@@ -145,6 +149,7 @@ user *login_phase() {
 
     } else {
       printf("Welcome, you are now logged in!\n");
+      printf("Redirecting you to room selection...\n");
 
       user = malloc(sizeof(*user));
       if (user == NULL) {
@@ -153,6 +158,9 @@ user *login_phase() {
       }
 
       initialize_user(user, username, password, language);
+
+      sleep(1);
+      system("clear");
     }
   } while (login_choice == 1);
 
@@ -164,37 +172,39 @@ int main() {
   char server_response_buffer[BUFSIZE];
   char message_buffer[BUFSIZE];
   int room_choice;
+  user *user = NULL;
 
   while (1) {
     // Authentication
     //
-    user *user = NULL;
-    int login_or_registration = 0;
+    if (user == NULL) {
+      int login_or_registration = 0;
 
-    printf("--- Welcome to Chatlingo, do you want to login (1) or register "
-           "(2)? Make your choice and enjoy your time here! ---\n");
+      printf("--- Welcome to Chatlingo, do you want to login (1) or register "
+             "(2)? Make your choice and enjoy your time here! ---\n");
 
-    do {
-      scanf("%d", &login_or_registration);
+      do {
+        scanf("%d", &login_or_registration);
 
-      switch (login_or_registration) {
-      case 1:
-        // Login
-        //
-        user = login_phase();
-        break;
+        switch (login_or_registration) {
+        case 1:
+          // Login
+          //
+          user = login_phase();
+          break;
 
-      case 2:
-        // Registration
-        //
-        user = registration_phase();
-        break;
+        case 2:
+          // Registration
+          //
+          user = registration_phase();
+          break;
 
-      default:
-        printf("Wrong choice, please try again!\n");
-        break;
-      }
-    } while (login_or_registration != 1 && login_or_registration != 2);
+        default:
+          printf("Wrong choice, please try again!\n");
+          break;
+        }
+      } while (login_or_registration != 1 && login_or_registration != 2);
+    }
 
     // Room choice
     //
@@ -235,8 +245,12 @@ int main() {
       // selection
       if (strcmp(message_buffer, "/ciao") == 0 ||
           strcmp(message_buffer, "/exit") == 0) {
-        printf("Disconnected from current room.\n");
+        printf("Disconnecting from current room. Sending you back to room "
+               "selection...\n");
         close(sockfd);
+
+        sleep(1);
+        system("clear");
         break;
       }
 
@@ -253,7 +267,7 @@ int main() {
       }
 
       server_response_buffer[num_bytes_received] = '\0';
-      printf("Server response: %s\n", server_response_buffer);
+      // printf("Server response: %s\n", server_response_buffer);
     }
 
     printf("Do you want to choose another room? (y/n): ");
@@ -262,6 +276,9 @@ int main() {
     getchar(); // Consume newline
     if (choice != 'y' && choice != 'Y') {
       printf("Exiting...\n");
+
+      sleep(1);
+      system("clear");
       break;
     }
   }

@@ -102,7 +102,7 @@ void *room_english_to_italian(void *arg) {
       }
 
       buffer[bytes_received] = '\0';
-      printf("Received from client %s: %s\n", client_ip, buffer);
+      // printf("Received from client %s: %s\n", client_ip, buffer);
 
       // Remove the user: and read only the message
       char *message_without_user = strchr(buffer, ':');
@@ -116,6 +116,7 @@ void *room_english_to_italian(void *arg) {
         printf("Translation english -> italian: %s\n", translated_str);
       } else {
         translated_str = message_without_user;
+        printf("Translation not found: %s\n", translated_str);
       }
 
       // Send a response back to the client
@@ -175,7 +176,7 @@ void *room_italian_to_english(void *arg) {
       }
 
       buffer[bytes_received] = '\0';
-      printf("Received from client %s: %s\n", client_ip, buffer);
+      // printf("Received from client %s: %s\n", client_ip, buffer);
 
       // Remove the user: and read only the message
       char *message_without_user = strchr(buffer, ':');
@@ -189,6 +190,7 @@ void *room_italian_to_english(void *arg) {
         printf("Translation italian -> english: %s\n", translated_str);
       } else {
         translated_str = message_without_user;
+        printf("Translation not found: %s\n", translated_str);
       }
 
       // Send a response back to the client
