@@ -5,6 +5,7 @@
 #include <netinet/in.h>
 #include <pthread.h>
 #include <signal.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,6 +17,14 @@
 #define PORT_ITALIAN_TO_ENGLISH 6969
 #define BUFSIZE 1024
 #define MAX_LENGTH 1000
+#define MAX_USERS_PER_ROOM 2
+
+atomic_int active_english_to_italian_clients = 0;
+atomic_int active_italian_to_english_clients = 0;
+pthread_mutex_t client_english_to_italian_count_mutex =
+    PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t client_italian_to_english_count_mutex =
+    PTHREAD_MUTEX_INITIALIZER;
 
 typedef struct {
   ht_hash_table *english_to_italian;
@@ -151,6 +160,18 @@ void *handle_client_english_to_italian(void *arg) {
   char buffer[BUFSIZE];
   clientinfo *client_info = (clientinfo *)arg;
 
+  if (active_english_to_italian_clients == MAX_USERS_PER_ROOM) {
+    printf("ROOM IS LOCKED! Retry again after some time...\n");
+
+    // Send the response to the client
+    send(client_info->client_socket, "LOCKED", strlen("LOCKED"), 0);
+    return NULL;
+  }
+
+  pthread_mutex_lock(&client_english_to_italian_count_mutex);
+  active_english_to_italian_clients++;
+  pthread_mutex_unlock(&client_english_to_italian_count_mutex);
+
   while (1) {
     // Receive data from client
     int bytes_received = recv(client_info->client_socket, buffer, BUFSIZE, 0);
@@ -197,12 +218,28 @@ void *handle_client_english_to_italian(void *arg) {
 
   close(client_info->client_socket);
 
+  pthread_mutex_lock(&client_english_to_italian_count_mutex);
+  active_english_to_italian_clients--;
+  pthread_mutex_unlock(&client_english_to_italian_count_mutex);
+
   return NULL;
 }
 
 void *handle_client_italian_to_english(void *arg) {
   char buffer[BUFSIZE];
   clientinfo *client_info = (clientinfo *)arg;
+
+  if (active_italian_to_english_clients == MAX_USERS_PER_ROOM) {
+    printf("ROOM IS LOCKED! Retry again after some time...\n");
+
+    // Send the response to the client
+    send(client_info->client_socket, "LOCKED", strlen("LOCKED"), 0);
+    return NULL;
+  }
+
+  pthread_mutex_lock(&client_italian_to_english_count_mutex);
+  active_italian_to_english_clients++;
+  pthread_mutex_unlock(&client_italian_to_english_count_mutex);
 
   while (1) {
     // Receive data from client
@@ -249,6 +286,10 @@ void *handle_client_italian_to_english(void *arg) {
   }
 
   close(client_info->client_socket);
+
+  pthread_mutex_lock(&client_english_to_italian_count_mutex);
+  active_english_to_italian_clients--;
+  pthread_mutex_unlock(&client_english_to_italian_count_mutex);
 
   return NULL;
 }

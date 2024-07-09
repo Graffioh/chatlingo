@@ -1,3 +1,5 @@
 marco,concilio,africano
 graffioh,graffioh,italian
 a,a,a
+w,w,w
+aa,aa,aa

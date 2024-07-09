@@ -368,6 +368,12 @@ int main() {
 
       server_response_buffer[num_bytes_received] = '\0';
       // printf("Server response: %s\n", server_response_buffer);
+
+      if (strcmp(server_response_buffer, "LOCKED") == 0) {
+        printf("Can't send the message because the server room is full, try "
+               "again after some time.\n");
+        break;
+      }
     }
 
     printf("Do you want to choose another room? (y/n): ");
