@@ -200,7 +200,6 @@ user *login_phase() {
 
       switch (login_choice) {
       case 1:
-        printf("Moving you to login...");
         break;
 
       case 2:
@@ -228,7 +227,7 @@ user *login_phase() {
       sleep(1);
       system("clear");
     }
-  } while (login_choice == 1);
+  } while (login_choice == 1 && user == NULL);
 
   return user;
 }

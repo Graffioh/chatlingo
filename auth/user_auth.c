@@ -48,7 +48,6 @@ user *login(const char *username, const char *password) {
 
     if (strcmp(stored_username, username) == 0 &&
         strcmp(stored_password, password) == 0) {
-      fclose(file);
 
       user = malloc(sizeof(*user));
       if (user == NULL) {
