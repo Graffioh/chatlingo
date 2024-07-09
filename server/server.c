@@ -31,6 +31,10 @@ void server_shutdown_handler(int sig) {
   exit(0);
 }
 
+// Translation handling
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
 // Create vocabulary hash tables for text file
 vocab *vocab_setup_from_txt() {
   FILE *file = fopen("./server/vocab.txt", "r");
@@ -66,6 +70,34 @@ vocab *vocab_setup_from_txt() {
 
 void first_letter_uppercase(char *str) { str[0] = toupper(str[0]); }
 
+char *reattach_username(char *original_message, char *translated_message) {
+  char *username_end = strchr(original_message, ':');
+  if (username_end != NULL) {
+    // Calculate length of username
+    size_t username_len = username_end - original_message;
+
+    // Allocate space for the final message, including the colon and space
+    // between user and message
+    char *final_message = malloc(username_len + strlen(translated_message) +
+                                 3); // +3 for ": " and null terminator
+
+    // Copy username
+    memcpy(final_message, original_message, username_len);
+
+    // Add colon and space
+    final_message[username_len] = ':';
+    final_message[username_len + 1] = ' ';
+
+    // Append translated message
+    strcpy(final_message + username_len + 2, translated_message);
+
+    return final_message;
+  } else {
+    // No username found, return the translated message as-is
+    return translated_message;
+  }
+}
+
 char *translate_phrase(ht_hash_table *dictionary, char *phrase) {
   char *result = malloc(BUFSIZE);
   result[0] = '\0';
@@ -90,6 +122,137 @@ char *translate_phrase(ht_hash_table *dictionary, char *phrase) {
 
   return result;
 }
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+// Multiple clients handling
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+typedef struct {
+  int client_socket;
+  int client_port;
+  vocab *vocabulary;
+} clientinfo;
+
+// char *get_username(char *message) {
+//   char *username_end = strchr(message, ':');
+//   if (username_end != NULL) {
+//     size_t username_len = username_end - message;
+//     char *username = malloc(username_len + 1); // +1 for null terminator
+//     strncpy(username, message, username_len);
+//     username[username_len] = '\0';
+//     return username; // Remember to free this after use
+//   } else {
+//     return NULL; // No username found
+//   }
+// }
+
+void *handle_client_english_to_italian(void *arg) {
+  char buffer[BUFSIZE];
+  clientinfo *client_info = (clientinfo *)arg;
+
+  while (1) {
+    // Receive data from client
+    int bytes_received = recv(client_info->client_socket, buffer, BUFSIZE, 0);
+    if (bytes_received <= 0) {
+      if (bytes_received == 0) {
+        printf("Client: %d disconnected\n", client_info->client_port);
+      } else {
+        perror("recv failed");
+      }
+      break;
+    }
+
+    buffer[bytes_received] = '\0';
+    // printf("Received from client %s: %s\n", client_ip, buffer);
+
+    // Remove the user: and read only the message
+    char *message_without_user = strchr(buffer, ':');
+    if (message_without_user != NULL) {
+      message_without_user += 2;
+    }
+
+    // Translate the phrase
+    char *translated_phrase = translate_phrase(
+        client_info->vocabulary->english_to_italian, message_without_user);
+
+    // Reattach the username
+    char *final_message = reattach_username(buffer, translated_phrase);
+
+    printf("%s\n", final_message);
+
+    // Send the response to the client
+    send(client_info->client_socket, final_message, strlen(final_message), 0);
+
+    free(translated_phrase);
+    free(final_message);
+
+    if (strcmp(message_without_user, "/ciao") == 0 ||
+        strcmp(message_without_user, "/exit") == 0) {
+      printf("Client: %d requested to close the connection.\n",
+             client_info->client_port);
+      break;
+    }
+  }
+
+  close(client_info->client_socket);
+
+  return NULL;
+}
+
+void *handle_client_italian_to_english(void *arg) {
+  char buffer[BUFSIZE];
+  clientinfo *client_info = (clientinfo *)arg;
+
+  while (1) {
+    // Receive data from client
+    int bytes_received = recv(client_info->client_socket, buffer, BUFSIZE, 0);
+    if (bytes_received <= 0) {
+      if (bytes_received == 0) {
+        printf("Client: %d disconnected\n", client_info->client_port);
+      } else {
+        perror("recv failed");
+      }
+      break;
+    }
+
+    buffer[bytes_received] = '\0';
+    // printf("Received from client %s: %s\n", client_ip, buffer);
+
+    // Remove the user: and read only the message
+    char *message_without_user = strchr(buffer, ':');
+    if (message_without_user != NULL) {
+      message_without_user += 2;
+    }
+
+    // Translate the phrase
+    char *translated_phrase = translate_phrase(
+        client_info->vocabulary->italian_to_english, message_without_user);
+
+    // Reattach the username
+    char *final_message = reattach_username(buffer, translated_phrase);
+
+    printf("%s\n", final_message);
+
+    // Send the response to the client
+    send(client_info->client_socket, final_message, strlen(final_message), 0);
+
+    free(translated_phrase);
+    free(final_message);
+
+    if (strcmp(message_without_user, "/ciao") == 0 ||
+        strcmp(message_without_user, "/exit") == 0) {
+      printf("Client: %d requested to close the connection.\n",
+             client_info->client_port);
+      break;
+    }
+  }
+
+  close(client_info->client_socket);
+
+  return NULL;
+}
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 // Rooms
 //
@@ -98,8 +261,6 @@ char *translate_phrase(ht_hash_table *dictionary, char *phrase) {
 // English -> Italian
 void *room_english_to_italian(void *arg) {
   vocab *v = (vocab *)arg;
-
-  ht_hash_table *ht_english_to_italian = v->english_to_italian;
 
   int client_socket;
   struct sockaddr_in client_addr;
@@ -119,49 +280,26 @@ void *room_english_to_italian(void *arg) {
 
     // Print connected client's information
     char client_ip[INET_ADDRSTRLEN];
+    int client_port = client_addr.sin_port;
+
     inet_ntop(AF_INET, &(client_addr.sin_addr), client_ip, INET_ADDRSTRLEN);
-    printf("Client connected: IP = %s, Port = %d\n", client_ip,
-           ntohs(client_addr.sin_port));
+    printf("Client connected: IP = %s, Port = %d\n", client_ip, client_port);
 
-    while (1) {
-      // Receive data from client
-      int bytes_received = recv(client_socket, buffer, BUFSIZE, 0);
-      if (bytes_received <= 0) {
-        if (bytes_received == 0) {
-          printf("Client: %s disconnected\n", client_ip);
-        } else {
-          perror("recv failed");
-        }
-        break;
-      }
+    clientinfo *client_info = malloc(sizeof(clientinfo));
+    client_info->client_socket = client_socket;
+    client_info->vocabulary = v;
+    client_info->client_port = client_port;
 
-      buffer[bytes_received] = '\0';
-      // printf("Received from client %s: %s\n", client_ip, buffer);
-
-      // Remove the user: and read only the message
-      char *message_without_user = strchr(buffer, ':');
-      if (message_without_user != NULL) {
-        message_without_user += 2;
-      }
-
-      // Translate the phrase
-      char *translated_phrase =
-          translate_phrase(ht_english_to_italian, message_without_user);
-      printf("Translation italian -> english: %s\n", translated_phrase);
-
-      send(client_socket, translated_phrase, strlen(translated_phrase), 0);
-      free(translated_phrase);
-
-      if (strcmp(message_without_user, "/ciao") == 0 ||
-          strcmp(message_without_user, "/exit") == 0) {
-        printf("Client: %s requested to close the connection.\n", client_ip);
-        break;
-      }
+    pthread_t client_thread;
+    if (pthread_create(&client_thread, NULL, handle_client_english_to_italian,
+                       (void *)client_info) != 0) {
+      perror("Failed to create client thread");
+      close(client_socket);
+      continue;
     }
 
-    close(client_socket);
+    pthread_detach(client_thread);
   }
-
   return NULL;
 }
 
@@ -189,46 +327,25 @@ void *room_italian_to_english(void *arg) {
 
     // Print connected client's information
     char client_ip[INET_ADDRSTRLEN];
+    int client_port = client_addr.sin_port;
+
     inet_ntop(AF_INET, &(client_addr.sin_addr), client_ip, INET_ADDRSTRLEN);
-    printf("Client connected: IP = %s, Port = %d\n", client_ip,
-           ntohs(client_addr.sin_port));
+    printf("Client connected: IP = %s, Port = %d\n", client_ip, client_port);
 
-    while (1) {
-      // Receive data from client
-      int bytes_received = recv(client_socket, buffer, BUFSIZE, 0);
-      if (bytes_received <= 0) {
-        if (bytes_received == 0) {
-          printf("Client: %s disconnected\n", client_ip);
-        } else {
-          perror("recv failed");
-        }
-        break;
-      }
+    clientinfo *client_info = malloc(sizeof(clientinfo));
+    client_info->client_socket = client_socket;
+    client_info->vocabulary = v;
+    client_info->client_port = client_port;
 
-      buffer[bytes_received] = '\0';
-      // printf("Received from client %s: %s\n", client_ip, buffer);
-
-      // Remove the user: and read only the message
-      char *message_without_user = strchr(buffer, ':');
-      if (message_without_user != NULL) {
-        message_without_user += 2;
-      }
-
-      char *translated_phrase =
-          translate_phrase(ht_italian_to_english, message_without_user);
-      printf("Translation italian -> english: %s\n", translated_phrase);
-
-      send(client_socket, translated_phrase, strlen(translated_phrase), 0);
-      free(translated_phrase);
-
-      if (strcmp(message_without_user, "/ciao") == 0 ||
-          strcmp(message_without_user, "/exit") == 0) {
-        printf("Client: %s requested to close the connection.\n", client_ip);
-        break;
-      }
+    pthread_t client_thread;
+    if (pthread_create(&client_thread, NULL, handle_client_italian_to_english,
+                       (void *)client_info) != 0) {
+      perror("Failed to create client thread");
+      close(client_socket);
+      continue;
     }
 
-    close(client_socket);
+    pthread_detach(client_thread);
   }
 
   return NULL;
