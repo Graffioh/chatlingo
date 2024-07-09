@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <termios.h>
 #include <unistd.h>
 
 #include "../auth/user_auth.h"
@@ -10,6 +11,8 @@
 #define PORT_ENGLISH_TO_ITALIAN 8080
 #define PORT_ITALIAN_TO_ENGLISH 6969
 #define BUFSIZE 1024
+#define GREEN_COLOR "\033[0;32m"
+#define RESET_COLOR "\033[0m"
 
 int connect_to_server(int room_choice) {
   int sockfd;
@@ -46,17 +49,71 @@ int connect_to_server(int room_choice) {
   return sockfd;
 }
 
+// Configure terminal for single character input
+void enable_raw_mode() {
+  struct termios term;
+  tcgetattr(0, &term);
+  term.c_lflag &= ~(ICANON | ECHO);
+  tcsetattr(0, TCSANOW, &term);
+}
+
+// Restore terminal to normal mode
+void disable_raw_mode() {
+  struct termios term;
+  tcgetattr(0, &term);
+  term.c_lflag |= ICANON | ECHO;
+  tcsetattr(0, TCSANOW, &term);
+}
+
+// Read a single character
+char getch() {
+  char buf = 0;
+  if (read(0, &buf, 1) < 0)
+    return -1;
+  return buf;
+}
+
 int choose_room() {
-  int room_choice;
+  int selected = 1;
+  char key;
+
+  enable_raw_mode();
+
   do {
+    // Clear screen (ANSI escape code)
+    printf("\033[2J\033[H");
+
+    // Display menu
     printf("Choose a room:\n");
-    printf("1. English to Italian\n");
-    printf("2. Italian to English\n");
-    printf("Enter your choice (1 or 2): ");
-    scanf("%d", &room_choice);
-    getchar(); // Consume newline
-  } while (room_choice != 1 && room_choice != 2);
-  return room_choice;
+    printf("%s%c%s 1. English to Italian\n", selected == 1 ? GREEN_COLOR : "",
+           selected == 1 ? '>' : ' ', RESET_COLOR);
+    printf("%s%c%s 2. Italian to English\n", selected == 2 ? GREEN_COLOR : "",
+           selected == 2 ? '>' : ' ', RESET_COLOR);
+    printf("\nUse arrow up/down or j/k to select, Enter to confirm\n");
+
+    // Get user input
+    key = getch();
+
+    if (key == 27) { // ESC character
+      getch();       // Skip the [
+      key = getch();
+    }
+
+    // Update selection based on input
+    switch (key) {
+    case 65:
+    case 'k': // Up arrow or 'k'
+      selected = (selected == 1) ? 2 : 1;
+      break;
+    case 66:
+    case 'j': // Down arrow or 'j'
+      selected = (selected == 2) ? 1 : 2;
+      break;
+    case 10: // Enter key
+      disable_raw_mode();
+      return selected;
+    }
+  } while (1);
 }
 
 void initialize_user(user *user, const char *username, const char *password,
@@ -209,6 +266,7 @@ int main() {
     // Room choice
     //
     room_choice = choose_room();
+    fflush(stdin);
     sockfd = connect_to_server(room_choice);
 
     if (sockfd < 0) {
