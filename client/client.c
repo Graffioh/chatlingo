@@ -133,6 +133,10 @@ void initialize_user(user *user, const char *username, const char *password,
   user->language[MAX_LANGUAGE_LENGTH - 1] = '\0';
 }
 
+// Authentication
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
 user *registration_phase() {
   char username[MAX_USERNAME_LENGTH], password[MAX_PASSWORD_LENGTH],
       language[MAX_LANGUAGE_LENGTH];
@@ -229,6 +233,62 @@ user *login_phase() {
   return user;
 }
 
+void login_or_registration_selection(user **user) {
+  if (*user == NULL) {
+    int selected = 1;
+    char key;
+
+    enable_raw_mode();
+
+    do {
+      // Clear screen (ANSI escape code)
+      printf("\033[2J\033[H");
+
+      // Display menu
+      printf("--- Welcome to Chatlingo ---\n\n");
+      printf("Choose an option:\n");
+      printf("%s%c%s Login\n", selected == 1 ? GREEN_COLOR : "",
+             selected == 1 ? '>' : ' ', RESET_COLOR);
+      printf("%s%c%s Register\n", selected == 2 ? GREEN_COLOR : "",
+             selected == 2 ? '>' : ' ', RESET_COLOR);
+      printf("\nUse arrow up/down or j/k to select, Enter to confirm\n");
+
+      // Get user input
+      key = getch();
+
+      // Handle arrow keys (they send a sequence of characters)
+      if (key == 27) { // ESC character
+        getch();       // Skip the [
+        key = getch();
+      }
+
+      // Update selection based on input
+      switch (key) {
+      case 65:
+      case 'k': // Up arrow or 'k'
+        selected = (selected == 1) ? 2 : 1;
+        break;
+      case 66:
+      case 'j': // Down arrow or 'j'
+        selected = (selected == 2) ? 1 : 2;
+        break;
+      case 10: // Enter key
+        disable_raw_mode();
+        switch (selected) {
+        case 1:
+          *user = login_phase();
+          break;
+        case 2:
+          *user = registration_phase();
+          break;
+        }
+        return;
+      }
+    } while (1);
+  }
+}
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 int main() {
   int sockfd;
   char server_response_buffer[BUFSIZE];
@@ -239,34 +299,7 @@ int main() {
   while (1) {
     // Authentication
     //
-    if (user == NULL) {
-      int login_or_registration = 0;
-
-      printf("--- Welcome to Chatlingo, do you want to login (1) or register "
-             "(2)? Make your choice and enjoy your time here! ---\n");
-
-      do {
-        scanf("%d", &login_or_registration);
-
-        switch (login_or_registration) {
-        case 1:
-          // Login
-          //
-          user = login_phase();
-          break;
-
-        case 2:
-          // Registration
-          //
-          user = registration_phase();
-          break;
-
-        default:
-          printf("Wrong choice, please try again!\n");
-          break;
-        }
-      } while (login_or_registration != 1 && login_or_registration != 2);
-    }
+    login_or_registration_selection(&user);
 
     // Room choice
     //
