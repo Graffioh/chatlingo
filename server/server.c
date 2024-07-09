@@ -31,6 +31,7 @@ void server_shutdown_handler(int sig) {
   exit(0);
 }
 
+// Create vocabulary hash tables for text file
 vocab *vocab_setup_from_txt() {
   FILE *file = fopen("./server/vocab.txt", "r");
   if (file == NULL) {
@@ -90,6 +91,11 @@ char *translate_phrase(ht_hash_table *dictionary, char *phrase) {
   return result;
 }
 
+// Rooms
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// English -> Italian
 void *room_english_to_italian(void *arg) {
   vocab *v = (vocab *)arg;
 
@@ -159,6 +165,7 @@ void *room_english_to_italian(void *arg) {
   return NULL;
 }
 
+// Italian -> English
 void *room_italian_to_english(void *arg) {
   vocab *v = (vocab *)arg;
 
@@ -226,6 +233,35 @@ void *room_italian_to_english(void *arg) {
 
   return NULL;
 }
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+// Create thread for each room
+void room_creation(vocab *vocabulary) {
+  pthread_t th;
+  pthread_t th2;
+
+  if (pthread_create(&th, NULL, room_english_to_italian, (void *)vocabulary) !=
+      0) {
+    perror("Failed to create thread room english to italian");
+    exit(EXIT_FAILURE);
+  }
+
+  if (pthread_create(&th2, NULL, room_italian_to_english, (void *)vocabulary) !=
+      0) {
+    perror("Failed to create thread room italian to english");
+    exit(EXIT_FAILURE);
+  }
+
+  if (pthread_join(th, NULL) != 0) {
+    perror("Failed to join thread room english to italian");
+    exit(EXIT_FAILURE);
+  }
+
+  if (pthread_join(th2, NULL) != 0) {
+    perror("Failed to join thread room italian to english");
+    exit(EXIT_FAILURE);
+  }
+}
 
 int main() {
   struct sockaddr_in server_addr_english, server_addr_italian;
@@ -282,31 +318,7 @@ int main() {
   vocab *vocabulary = malloc(sizeof(vocab));
   vocabulary = vocab_setup_from_txt();
 
-  // creazione thread room english to italian
-  pthread_t th;
-  pthread_t th2;
-
-  if (pthread_create(&th, NULL, room_english_to_italian, (void *)vocabulary) !=
-      0) {
-    perror("Failed to create thread room english to italian");
-    exit(EXIT_FAILURE);
-  }
-
-  if (pthread_create(&th2, NULL, room_italian_to_english, (void *)vocabulary) !=
-      0) {
-    perror("Failed to create thread room italian to english");
-    exit(EXIT_FAILURE);
-  }
-
-  if (pthread_join(th, NULL) != 0) {
-    perror("Failed to join thread room english to italian");
-    exit(EXIT_FAILURE);
-  }
-
-  if (pthread_join(th2, NULL) != 0) {
-    perror("Failed to join thread room italian to english");
-    exit(EXIT_FAILURE);
-  }
+  room_creation(vocabulary);
 
   ht_del_hash_table(vocabulary->english_to_italian);
   ht_del_hash_table(vocabulary->italian_to_english);

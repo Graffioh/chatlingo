@@ -49,6 +49,10 @@ int connect_to_server(int room_choice) {
   return sockfd;
 }
 
+// Room selection
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
 // Configure terminal for single character input
 void enable_raw_mode() {
   struct termios term;
@@ -85,9 +89,9 @@ int choose_room() {
 
     // Display menu
     printf("Choose a room:\n");
-    printf("%s%c%s 1. English to Italian\n", selected == 1 ? GREEN_COLOR : "",
+    printf("%s%c%s English to Italian\n", selected == 1 ? GREEN_COLOR : "",
            selected == 1 ? '>' : ' ', RESET_COLOR);
-    printf("%s%c%s 2. Italian to English\n", selected == 2 ? GREEN_COLOR : "",
+    printf("%s%c%s Italian to English\n", selected == 2 ? GREEN_COLOR : "",
            selected == 2 ? '>' : ' ', RESET_COLOR);
     printf("\nUse arrow up/down or j/k to select, Enter to confirm\n");
 
@@ -115,6 +119,7 @@ int choose_room() {
     }
   } while (1);
 }
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 void initialize_user(user *user, const char *username, const char *password,
                      const char *language) {
@@ -336,7 +341,8 @@ int main() {
     printf("Do you want to choose another room? (y/n): ");
     char choice;
     scanf(" %c", &choice);
-    getchar(); // Consume newline
+    getchar();
+
     if (choice != 'y' && choice != 'Y') {
       printf("Exiting...\n");
 
