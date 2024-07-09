@@ -223,17 +223,22 @@ int main() {
       int username_length = strlen(user->username);
       char message_with_user[BUFSIZE + username_length + 4];
 
-      printf("Enter message: ");
-      if (fgets(message_buffer, BUFSIZE, stdin) != NULL) {
-        snprintf(message_with_user, sizeof(message_with_user), "%s: %s",
-                 user->username, message_buffer);
+      // loop till the message is empty or only contains whitespace
+      do {
+        printf("Enter message: ");
+        if (fgets(message_buffer, BUFSIZE, stdin) == NULL) {
+          perror("Error reading input");
+          return -1;
+        }
 
-        message_with_user[strcspn(message_with_user, "\n")] = '\0';
         message_buffer[strcspn(message_buffer, "\n")] = '\0';
-      } else {
-        perror("Error reading input");
-        break;
-      }
+
+      } while (strspn(message_buffer, " \t\n\r") == strlen(message_buffer));
+
+      snprintf(message_with_user, sizeof(message_with_user), "%s: %s",
+               user->username, message_buffer);
+
+      message_with_user[strcspn(message_with_user, "\n")] = '\0';
 
       // Send message to server
       if (send(sockfd, message_with_user, strlen(message_with_user), 0) < 0) {

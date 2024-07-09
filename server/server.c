@@ -31,36 +31,6 @@ void server_shutdown_handler(int sig) {
   exit(0);
 }
 
-void first_letter_uppercase(char *str) { str[0] = toupper(str[0]); }
-
-char *translate_phrase(ht_hash_table *dictionary, char *phrase) {
-  char *result = malloc(BUFSIZE);
-  result[0] = '\0';
-  char *word = strtok(phrase, " ");
-
-  while (word != NULL) {
-
-    first_letter_uppercase(word);
-
-    char *translated = ht_search(dictionary, word);
-    if (translated == NULL) {
-      translated = word;
-    }
-
-    strcat(result, translated);
-    strcat(result, " ");
-
-    word = strtok(NULL, " ");
-  }
-
-  size_t len = strlen(result);
-  if (len > 0 && result[len - 1] == ' ') {
-    result[len - 1] = '\0';
-  }
-
-  return result;
-}
-
 vocab *vocab_setup_from_txt() {
   FILE *file = fopen("./server/vocab.txt", "r");
   if (file == NULL) {
@@ -91,6 +61,33 @@ vocab *vocab_setup_from_txt() {
   fclose(file);
 
   return v;
+}
+
+void first_letter_uppercase(char *str) { str[0] = toupper(str[0]); }
+
+char *translate_phrase(ht_hash_table *dictionary, char *phrase) {
+  char *result = malloc(BUFSIZE);
+  result[0] = '\0';
+  char *word = strtok(phrase, " ");
+
+  while (word != NULL) {
+    first_letter_uppercase(word);
+
+    char *translated_word = ht_search(dictionary, word);
+    if (translated_word == NULL) {
+      translated_word = word;
+    }
+
+    strcat(result, translated_word);
+    strcat(result, " ");
+
+    word = strtok(NULL, " ");
+  }
+
+  int len = strlen(result);
+  result[len - 1] = '\0';
+
+  return result;
 }
 
 void *room_english_to_italian(void *arg) {
