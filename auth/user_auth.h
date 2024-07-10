@@ -12,6 +12,7 @@ typedef struct {
   char username[MAX_USERNAME_LENGTH];
   char password[MAX_PASSWORD_LENGTH];
   char language[MAX_LANGUAGE_LENGTH];
+  char user_port[50];
 } user;
 
 bool register_user(const char *username, const char *password,

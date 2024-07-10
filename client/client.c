@@ -14,6 +14,35 @@
 #define GREEN_COLOR "\033[0;32m"
 #define RESET_COLOR "\033[0m"
 
+// Functions to enable menu arrow selection
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// Configure terminal for single character input
+void enable_raw_mode() {
+  struct termios term;
+  tcgetattr(0, &term);
+  term.c_lflag &= ~(ICANON | ECHO);
+  tcsetattr(0, TCSANOW, &term);
+}
+
+// Restore terminal to normal mode
+void disable_raw_mode() {
+  struct termios term;
+  tcgetattr(0, &term);
+  term.c_lflag |= ICANON | ECHO;
+  tcsetattr(0, TCSANOW, &term);
+}
+
+// Read a single character
+char getch() {
+  char buf = 0;
+  if (read(0, &buf, 1) < 0)
+    return -1;
+  return buf;
+}
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 int connect_to_server(int room_choice) {
   int sockfd;
   struct sockaddr_in server_addr;
@@ -46,6 +75,7 @@ int connect_to_server(int room_choice) {
 
   printf("Connected to %s room\n",
          room_choice == 1 ? "English to Italian" : "Italian to English");
+
   return sockfd;
 }
 
@@ -53,30 +83,6 @@ int connect_to_server(int room_choice) {
 //
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
-// Configure terminal for single character input
-void enable_raw_mode() {
-  struct termios term;
-  tcgetattr(0, &term);
-  term.c_lflag &= ~(ICANON | ECHO);
-  tcsetattr(0, TCSANOW, &term);
-}
-
-// Restore terminal to normal mode
-void disable_raw_mode() {
-  struct termios term;
-  tcgetattr(0, &term);
-  term.c_lflag |= ICANON | ECHO;
-  tcsetattr(0, TCSANOW, &term);
-}
-
-// Read a single character
-char getch() {
-  char buf = 0;
-  if (read(0, &buf, 1) < 0)
-    return -1;
-  return buf;
-}
-
 int choose_room() {
   int selected = 1;
   char key;
@@ -84,8 +90,7 @@ int choose_room() {
   enable_raw_mode();
 
   do {
-    // Clear screen (ANSI escape code)
-    printf("\033[2J\033[H");
+    system("clear");
 
     // Display menu
     printf("Choose a room:\n");
@@ -170,7 +175,7 @@ user *registration_phase() {
       initialize_user(user, username, password, language);
 
       sleep(1);
-      system("clear");
+      //      system("clear");
     }
   } while (registration_check == 0);
 
@@ -225,7 +230,7 @@ user *login_phase() {
       initialize_user(user, username, password, language);
 
       sleep(1);
-      system("clear");
+      // system("clear");
     }
   } while (login_choice == 1 && user == NULL);
 
@@ -240,8 +245,7 @@ void login_or_registration_selection(user **user) {
     enable_raw_mode();
 
     do {
-      // Clear screen (ANSI escape code)
-      printf("\033[2J\033[H");
+      system("clear");
 
       // Display menu
       printf("--- Welcome to Chatlingo ---\n\n");
@@ -296,6 +300,8 @@ int main() {
   user *user = NULL;
 
   while (1) {
+    char server_response_port_buffer[50];
+
     // Authentication
     //
     login_or_registration_selection(&user);
@@ -305,6 +311,19 @@ int main() {
     room_choice = choose_room();
     fflush(stdin);
     sockfd = connect_to_server(room_choice);
+
+    // Receive Client port from server
+    int num_bytes_received = recv(sockfd, server_response_port_buffer, 50, 0);
+    if (num_bytes_received <= 0) {
+      if (num_bytes_received == 0) {
+        printf("Server disconnected.\n");
+      } else {
+        perror("recv failed");
+      }
+      close(sockfd);
+    }
+
+    strcpy(user->user_port, server_response_port_buffer);
 
     if (sockfd < 0) {
       printf("Failed to connect. Try again.\n");
@@ -350,7 +369,7 @@ int main() {
         close(sockfd);
 
         sleep(1);
-        system("clear");
+        // system("clear");
         break;
       }
 
@@ -372,6 +391,20 @@ int main() {
       if (strcmp(server_response_buffer, "LOCKED") == 0) {
         printf("Can't send the message because the server room is full, try "
                "again after some time.\n");
+        printf("You are in the queue...\n");
+        printf("If you want to select another room, press 'q'\n");
+
+        char exit_choice;
+        do {
+          scanf(" %c", &exit_choice);
+          getchar();
+
+          if (exit_choice != 'q') {
+            printf("Still waiting...\n");
+            sleep(1);
+          }
+        } while (exit_choice != 'q');
+
         break;
       }
     }
@@ -381,11 +414,14 @@ int main() {
     scanf(" %c", &choice);
     getchar();
 
+    printf("Redirecting you to room choice...\n");
+    sleep(1);
+
     if (choice != 'y' && choice != 'Y') {
       printf("Exiting...\n");
 
       sleep(1);
-      system("clear");
+      // system("clear");
       break;
     }
   }

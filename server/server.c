@@ -17,7 +17,7 @@
 #define PORT_ITALIAN_TO_ENGLISH 6969
 #define BUFSIZE 1024
 #define MAX_LENGTH 1000
-#define MAX_USERS_PER_ROOM 2
+#define MAX_USERS_PER_ROOM 1
 
 atomic_int active_english_to_italian_clients = 0;
 atomic_int active_italian_to_english_clients = 0;
@@ -287,9 +287,9 @@ void *handle_client_italian_to_english(void *arg) {
 
   close(client_info->client_socket);
 
-  pthread_mutex_lock(&client_english_to_italian_count_mutex);
-  active_english_to_italian_clients--;
-  pthread_mutex_unlock(&client_english_to_italian_count_mutex);
+  pthread_mutex_lock(&client_italian_to_english_count_mutex);
+  active_italian_to_english_clients--;
+  pthread_mutex_unlock(&client_italian_to_english_count_mutex);
 
   return NULL;
 }
@@ -322,6 +322,11 @@ void *room_english_to_italian(void *arg) {
     // Print connected client's information
     char client_ip[INET_ADDRSTRLEN];
     int client_port = client_addr.sin_port;
+
+    // Sending the client port back to the client
+    char port_str[20];
+    snprintf(port_str, sizeof(port_str), "PORT:%d", client_port);
+    send(client_socket, port_str, strlen(port_str), 0);
 
     inet_ntop(AF_INET, &(client_addr.sin_addr), client_ip, INET_ADDRSTRLEN);
     printf("Client connected: IP = %s, Port = %d\n", client_ip, client_port);
