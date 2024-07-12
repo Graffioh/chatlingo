@@ -1,4 +1,6 @@
 #include <arpa/inet.h>
+#include <errno.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,6 +15,9 @@
 #define BUFSIZE 1024
 #define GREEN_COLOR "\033[0;32m"
 #define RESET_COLOR "\033[0m"
+
+volatile sig_atomic_t is_server_running = 1;
+volatile sig_atomic_t should_exit_queue = 0;
 
 // Functions to enable menu arrow selection
 //
@@ -292,15 +297,53 @@ void login_or_registration_selection(user **user) {
 }
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+void *receive_shutdown_message_thread(void *socket_desc) {
+  int sockfd = *(int *)socket_desc;
+  char server_response_buffer[BUFSIZE];
+  int num_bytes_rec;
+
+  while (is_server_running) {
+    memset(server_response_buffer, 0, BUFSIZE);
+    num_bytes_rec = recv(sockfd, server_response_buffer, BUFSIZE - 1, 0);
+    if (num_bytes_rec > 0) {
+      server_response_buffer[num_bytes_rec] = '\0';
+      if (strcmp(server_response_buffer, "SERVER_SHUTDOWN") == 0) {
+        printf("Server is shutting down. Disconnecting...\n");
+        is_server_running = 0;
+        break;
+      }
+    } else if (num_bytes_rec == 0 ||
+               (num_bytes_rec == -1 && errno != EWOULDBLOCK &&
+                errno != EAGAIN)) {
+      printf("Server disconnected.\n");
+      is_server_running = 0;
+      break;
+    }
+  }
+
+  close(sockfd);
+  return NULL;
+}
+
 int main() {
   int sockfd;
   char server_response_buffer[BUFSIZE];
+  char server_response_port_buffer[BUFSIZE];
   char message_buffer[BUFSIZE];
   int room_choice;
   user *user = NULL;
 
+  pthread_t server_shutdown_thread;
+
+  if (pthread_create(&server_shutdown_thread, NULL,
+                     receive_shutdown_message_thread, (void *)&sockfd) < 0) {
+    perror("Could not create receive thread");
+    close(sockfd);
+  }
+
+  // while (is_server_running) {
   while (1) {
-    char server_response_port_buffer[50];
+    printf("ACTUAL SOCKFD: %d\n", sockfd);
 
     // Authentication
     //
@@ -312,8 +355,12 @@ int main() {
     fflush(stdin);
     sockfd = connect_to_server(room_choice);
 
+    printf("NEW SOCK FD: %d\n", sockfd);
+
     // Receive Client port from server
-    int num_bytes_received = recv(sockfd, server_response_port_buffer, 50, 0);
+    memset(server_response_port_buffer, 0, BUFSIZE);
+    int num_bytes_received =
+        recv(sockfd, server_response_port_buffer, BUFSIZE - 1, 0);
     if (num_bytes_received <= 0) {
       if (num_bytes_received == 0) {
         printf("Server disconnected.\n");
@@ -322,6 +369,8 @@ int main() {
       }
       close(sockfd);
     }
+
+    server_response_port_buffer[num_bytes_received] = '\0';
 
     strcpy(user->user_port, server_response_port_buffer);
 
@@ -345,12 +394,17 @@ int main() {
           return -1;
         }
 
+        printf("DOPO PRINTF ENTER MESSAGE\n");
+
         message_buffer[strcspn(message_buffer, "\n")] = '\0';
 
       } while (strspn(message_buffer, " \t\n\r") == strlen(message_buffer));
 
+      printf("PRIMA DI ASSEGNARE MESSAGE WITH USER\n");
       snprintf(message_with_user, sizeof(message_with_user), "%s: %s",
                user->username, message_buffer);
+
+      printf("DOPO ASSEGNARE MESSAGE WITH USER\n");
 
       message_with_user[strcspn(message_with_user, "\n")] = '\0';
 
@@ -359,6 +413,8 @@ int main() {
         perror("send failed");
         break;
       }
+
+      printf("DOPO AVER MANDATO IL MESSAGGIO AL SERVER\n");
 
       // When /ciao is sent, close current connection and go back to room
       // selection
@@ -369,14 +425,18 @@ int main() {
         close(sockfd);
 
         sleep(1);
-        // system("clear");
         break;
       }
 
+      printf("PRIMA DELLA RICEZIONE DELLA RISPOSTA DEL SERVER\n");
+
       // Receive response from server
-      int num_bytes_received = recv(sockfd, server_response_buffer, BUFSIZE, 0);
-      if (num_bytes_received <= 0) {
-        if (num_bytes_received == 0) {
+      //
+      memset(server_response_buffer, 0, BUFSIZE);
+      int num_bytes_received2 =
+          recv(sockfd, server_response_buffer, BUFSIZE - 1, 0);
+      if (num_bytes_received2 <= 0) {
+        if (num_bytes_received2 == 0) {
           printf("Server disconnected.\n");
         } else {
           perror("recv failed");
@@ -385,28 +445,80 @@ int main() {
         break;
       }
 
-      server_response_buffer[num_bytes_received] = '\0';
-      // printf("Server response: %s\n", server_response_buffer);
+      server_response_buffer[num_bytes_received2] = '\0';
 
+      printf("DOPO RICEZIONE RISPOSTA SERVER\n");
+
+      printf("Server response: %s\n", server_response_buffer);
+
+      // Waiting queue if the room is full = locked
       if (strcmp(server_response_buffer, "LOCKED") == 0) {
         printf("Can't send the message because the server room is full, try "
                "again after some time.\n");
-        printf("You are in the queue...\n");
-        printf("If you want to select another room, press 'q'\n");
+        printf("If you want to select another room, choose 'q'\n");
+        printf("Otherwise choose 'r' to enter in the queue\n");
 
         char exit_choice;
         do {
+          printf("What you want to do? \n");
           scanf(" %c", &exit_choice);
           getchar();
 
           if (exit_choice != 'q') {
-            printf("Still waiting...\n");
-            sleep(1);
+            system("clear");
+            printf("You are in queue now, wait for your turn...\n");
+
+            memset(server_response_buffer, 0, BUFSIZE);
+            int num_bytes_received3 =
+                recv(sockfd, server_response_buffer, BUFSIZE - 1, 0);
+            if (num_bytes_received3 <= 0) {
+              if (num_bytes_received3 == 0) {
+                printf("Server disconnected.\n");
+              } else {
+                perror("recv failed");
+              }
+              close(sockfd);
+              break;
+            }
+
+            server_response_buffer[num_bytes_received3] = '\0';
+
+            // qua non entra, va direttamente nell'else
+            if (strcmp(server_response_buffer, "LOCKED") == 0) {
+              printf("Room is full, still waiting...\n");
+              sleep(1);
+            } else {
+              sockfd = connect_to_server(room_choice);
+
+              memset(server_response_port_buffer, 0, BUFSIZE);
+              int num_bytes_received =
+                  recv(sockfd, server_response_port_buffer, BUFSIZE - 1, 0);
+              if (num_bytes_received <= 0) {
+                if (num_bytes_received == 0) {
+                  printf("Server disconnected.\n");
+                } else {
+                  perror("recv failed");
+                }
+                close(sockfd);
+              }
+
+              server_response_port_buffer[num_bytes_received] = '\0';
+
+              break;
+            }
           }
         } while (exit_choice != 'q');
 
-        break;
+        printf("DOPO SCELTA LOCKED \n");
+
+        if (strcmp(server_response_buffer, "LOCKED") == 0) {
+          break;
+        }
+
+        printf("DOPO IF LOCKED BREAK\n");
       }
+
+      printf("IF NOT LOCKED \n");
     }
 
     printf("Do you want to choose another room? (y/n): ");
@@ -414,17 +526,18 @@ int main() {
     scanf(" %c", &choice);
     getchar();
 
-    printf("Redirecting you to room choice...\n");
-    sleep(1);
-
     if (choice != 'y' && choice != 'Y') {
-      printf("Exiting...\n");
 
       sleep(1);
       // system("clear");
       break;
     }
+
+    printf("Redirecting you to room choice...\n");
+    sleep(1);
   }
+
+  pthread_join((void *)receive_shutdown_message_thread, NULL);
 
   return 0;
 }

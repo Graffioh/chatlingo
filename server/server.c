@@ -2,6 +2,7 @@
 
 #include <arpa/inet.h>
 #include <ctype.h>
+#include <errno.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <signal.h>
@@ -9,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 #include "../hash_table/hash_table.h"
@@ -17,7 +19,13 @@
 #define PORT_ITALIAN_TO_ENGLISH 6969
 #define BUFSIZE 1024
 #define MAX_LENGTH 1000
-#define MAX_USERS_PER_ROOM 1
+#define MAX_USERS_PER_ROOM 2
+#define MAX_CLIENTS 50
+
+pthread_mutex_t old_client_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+int waiting_client_socket_list[MAX_CLIENTS] = {0};
+pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 atomic_int active_english_to_italian_clients = 0;
 atomic_int active_italian_to_english_clients = 0;
@@ -33,10 +41,47 @@ typedef struct {
 
 int server_fd_english_to_italian, server_fs_italian_to_english;
 
+void add_client(int socket) {
+  pthread_mutex_lock(&clients_mutex);
+  for (int i = 0; i < MAX_CLIENTS; i++) {
+    if (waiting_client_socket_list[i] == 0) {
+      waiting_client_socket_list[i] = socket;
+      break;
+    }
+  }
+  pthread_mutex_unlock(&clients_mutex);
+}
+
+void remove_client(int socket) {
+  pthread_mutex_lock(&clients_mutex);
+  for (int i = 0; i < MAX_CLIENTS; i++) {
+    if (waiting_client_socket_list[i] == socket) {
+      printf("SONO ENTRATO BROOOO!\n");
+      waiting_client_socket_list[i] = 0;
+
+      break;
+    }
+  }
+  pthread_mutex_unlock(&clients_mutex);
+}
+
 void server_shutdown_handler(int sig) {
   printf("\nShutting down server...\n");
+
+  pthread_mutex_lock(&clients_mutex);
+  for (int i = 0; i < MAX_CLIENTS; i++) {
+    if (waiting_client_socket_list[i] != 0) {
+      send(waiting_client_socket_list[i], "SERVER_SHUTDOWN",
+           strlen("SERVER_SHUTDOWN"), 0);
+      close(waiting_client_socket_list[i]);
+      waiting_client_socket_list[i] = 0;
+    }
+  }
+  pthread_mutex_unlock(&clients_mutex);
+
   close(server_fd_english_to_italian);
   close(server_fs_italian_to_english);
+
   exit(0);
 }
 
@@ -156,16 +201,61 @@ typedef struct {
 //   }
 // }
 
+void broadcast_message(const char *message, int sender_socket) {
+  pthread_mutex_lock(&clients_mutex);
+  for (int i = 0; i < MAX_CLIENTS; i++) {
+    if (waiting_client_socket_list[i] != 0) {
+      printf("WAITING SOCKET BROADCAST SEND: %d\n",
+             waiting_client_socket_list[i]);
+
+      printf("MESSAGE IN BROADCAST: %s\n", message);
+
+      send(waiting_client_socket_list[i], message, strlen(message), 0);
+    }
+  }
+  printf("MANNAGGIA DIOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOo\n");
+  pthread_mutex_unlock(&clients_mutex);
+}
+
+atomic_int old_client = 0;
 void *handle_client_english_to_italian(void *arg) {
+  printf("ENTRATO IN THREAD CLIENT\n");
   char buffer[BUFSIZE];
   clientinfo *client_info = (clientinfo *)arg;
 
-  if (active_english_to_italian_clients == MAX_USERS_PER_ROOM) {
+  printf("Currently active users %d\n", active_english_to_italian_clients);
+
+  if (active_english_to_italian_clients >= MAX_USERS_PER_ROOM) {
+    atomic_store(&old_client, client_info->client_socket);
+
+    add_client(client_info->client_socket);
+
     printf("ROOM IS LOCKED! Retry again after some time...\n");
 
+    // printf("IN ROOM IS LOCKED ADD_CLIENT\n");
+    // pthread_mutex_lock(&clients_mutex);
+    // printf("Waiting client socket list: \n");
+    // for (int i = 0; i < 8; i++) {
+    //   printf("CLIENT SOCKET %d!\n", waiting_client_socket_list[i]);
+    // }
+    // pthread_mutex_unlock(&clients_mutex);
+
+    memset(buffer, 0, BUFSIZE);
+    strcpy(buffer, "LOCKED");
+
+    printf("BUFFER LOCKED: %s\n", buffer);
+
     // Send the response to the client
-    send(client_info->client_socket, "LOCKED", strlen("LOCKED"), 0);
+    send(client_info->client_socket, buffer, strlen(buffer), 0);
+
+    printf("HELLO\n");
+
     return NULL;
+  }
+
+  int client_to_remove = atomic_exchange(&old_client, 0);
+  if (client_to_remove != 0) {
+    remove_client(client_to_remove);
   }
 
   pthread_mutex_lock(&client_english_to_italian_count_mutex);
@@ -200,11 +290,15 @@ void *handle_client_english_to_italian(void *arg) {
     // Reattach the username
     char *final_message = reattach_username(buffer, translated_phrase);
 
+    memset(buffer, 0, BUFSIZE);
+    strcpy(buffer, final_message);
+
+    printf("BUFFER FINAL MESSAGE: %s\n", buffer);
+
     printf("%s\n", final_message);
 
     // Send the response to the client
-    send(client_info->client_socket, final_message, strlen(final_message), 0);
-
+    send(client_info->client_socket, buffer, strlen(buffer), 0);
     free(translated_phrase);
     free(final_message);
 
@@ -212,6 +306,20 @@ void *handle_client_english_to_italian(void *arg) {
         strcmp(message_without_user, "/exit") == 0) {
       printf("Client: %d requested to close the connection.\n",
              client_info->client_port);
+
+      printf("IN BROADCAST ADD_CLIENT\n");
+      pthread_mutex_lock(&clients_mutex);
+      printf("Waiting client socket list: \n");
+      for (int i = 0; i < 8; i++) {
+        printf("CLIENT SOCKET %d!\n", waiting_client_socket_list[i]);
+      }
+      pthread_mutex_unlock(&clients_mutex);
+
+      memset(buffer, 0, BUFSIZE);
+      strcpy(buffer, "NOT LOCKED");
+
+      broadcast_message(buffer, client_info->client_socket);
+
       break;
     }
   }
@@ -236,6 +344,8 @@ void *handle_client_italian_to_english(void *arg) {
     send(client_info->client_socket, "LOCKED", strlen("LOCKED"), 0);
     return NULL;
   }
+
+  add_client(client_info->client_socket);
 
   pthread_mutex_lock(&client_italian_to_english_count_mutex);
   active_italian_to_english_clients++;
@@ -281,9 +391,14 @@ void *handle_client_italian_to_english(void *arg) {
         strcmp(message_without_user, "/exit") == 0) {
       printf("Client: %d requested to close the connection.\n",
              client_info->client_port);
+
+      // broadcast_message("NOT LOCKED", client_info->client_socket);
+
       break;
     }
   }
+
+  remove_client(client_info->client_socket);
 
   close(client_info->client_socket);
 
@@ -315,7 +430,13 @@ void *room_english_to_italian(void *arg) {
     if ((client_socket = accept(server_fd_english_to_italian,
                                 (struct sockaddr *)&client_addr, &addr_len)) <
         0) {
-      perror("accept failed");
+      if (errno == EINTR || errno == ECONNABORTED) {
+        continue; // Handle interrupted calls or aborted connections
+      } else {
+        perror("accept failed");             // Log the error for debugging
+        close(server_fd_english_to_italian); // Clean up and exit
+        exit(EXIT_FAILURE);
+      }
       continue;
     }
 
@@ -326,7 +447,13 @@ void *room_english_to_italian(void *arg) {
     // Sending the client port back to the client
     char port_str[20];
     snprintf(port_str, sizeof(port_str), "PORT:%d", client_port);
-    send(client_socket, port_str, strlen(port_str), 0);
+
+    memset(buffer, 0, BUFSIZE);
+    strcpy(buffer, port_str);
+
+    printf("BUFFER PORT: %s\n", buffer);
+
+    send(client_socket, buffer, strlen(buffer), 0);
 
     inet_ntop(AF_INET, &(client_addr.sin_addr), client_ip, INET_ADDRSTRLEN);
     printf("Client connected: IP = %s, Port = %d\n", client_ip, client_port);
@@ -344,7 +471,11 @@ void *room_english_to_italian(void *arg) {
       continue;
     }
 
+    printf("DOPO CREAZIONE THREAD CLIENT\n");
+
     pthread_detach(client_thread);
+
+    printf("DOPO DETACH THREAD CLIENT\n");
   }
   return NULL;
 }
@@ -436,6 +567,19 @@ int main() {
   }
   if ((server_fs_italian_to_english = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
     perror("socket failed for Italian to English");
+    exit(EXIT_FAILURE);
+  }
+
+  // Things for server shutdown
+  int opt = 1;
+  if (setsockopt(server_fd_english_to_italian, SOL_SOCKET, SO_REUSEADDR, &opt,
+                 sizeof(opt)) < 0) {
+    perror("setsockopt failed for English to Italian");
+    exit(EXIT_FAILURE);
+  }
+  if (setsockopt(server_fs_italian_to_english, SOL_SOCKET, SO_REUSEADDR, &opt,
+                 sizeof(opt)) < 0) {
+    perror("setsockopt failed for Italian to English");
     exit(EXIT_FAILURE);
   }
 
