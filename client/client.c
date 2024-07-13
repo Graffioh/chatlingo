@@ -343,8 +343,6 @@ int main() {
 
   // while (is_server_running) {
   while (1) {
-    printf("ACTUAL SOCKFD: %d\n", sockfd);
-
     // Authentication
     //
     login_or_registration_selection(&user);
@@ -354,8 +352,6 @@ int main() {
     room_choice = choose_room();
     fflush(stdin);
     sockfd = connect_to_server(room_choice);
-
-    printf("NEW SOCK FD: %d\n", sockfd);
 
     // Receive Client port from server
     memset(server_response_port_buffer, 0, BUFSIZE);
@@ -468,6 +464,8 @@ int main() {
             system("clear");
             printf("You are in queue now, wait for your turn...\n");
 
+            printf("BEFORE QUEUE!!!!!!!!!!!!\n");
+
             memset(server_response_buffer, 0, BUFSIZE);
             int num_bytes_received3 =
                 recv(sockfd, server_response_buffer, BUFSIZE - 1, 0);
@@ -482,6 +480,8 @@ int main() {
             }
 
             server_response_buffer[num_bytes_received3] = '\0';
+
+            printf("SERVER RESPONSE AFTER QUEUE: %s\n", server_response_buffer);
 
             // qua non entra, va direttamente nell'else
             if (strcmp(server_response_buffer, "LOCKED") == 0) {
