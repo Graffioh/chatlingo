@@ -48,6 +48,10 @@ char getch() {
 }
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+// Room selection
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
 int connect_to_server(int room_choice) {
   int sockfd;
   struct sockaddr_in server_addr;
@@ -64,6 +68,7 @@ int connect_to_server(int room_choice) {
   server_addr.sin_port = htons(room_choice == 1 ? PORT_ENGLISH_TO_ITALIAN
                                                 : PORT_ITALIAN_TO_ENGLISH);
 
+  // Convert string into IP address format
   if (inet_pton(AF_INET, SERVER_IP, &server_addr.sin_addr) <= 0) {
     perror("inet_pton failed");
     close(sockfd);
@@ -84,10 +89,6 @@ int connect_to_server(int room_choice) {
   return sockfd;
 }
 
-// Room selection
-//
-// +++++++++++++++++++++++++++++++++++++++++++++++++++++++
-//
 int choose_room() {
   int selected = 1;
   char key;
@@ -108,22 +109,23 @@ int choose_room() {
     // Get user input
     key = getch();
 
-    if (key == 27) { // ESC character
-      getch();       // Skip the [
+    // If ESC
+    if (key == 27) {
+      getch();
       key = getch();
     }
 
     // Update selection based on input
     switch (key) {
-    case 65:
-    case 'k': // Up arrow or 'k'
+    case 65: // up arrow
+    case 'k':
       selected = (selected == 1) ? 2 : 1;
       break;
-    case 66:
-    case 'j': // Down arrow or 'j'
+    case 66: // down arrow
+    case 'j':
       selected = (selected == 2) ? 1 : 2;
       break;
-    case 10: // Enter key
+    case 10: // Enter
       disable_raw_mode();
       return selected;
     }
@@ -131,8 +133,13 @@ int choose_room() {
 }
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-void initialize_user(user *user, const char *username, const char *password,
-                     const char *language) {
+// Authentication
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+void initialize_user_authentication(user *user, const char *username,
+                                    const char *password,
+                                    const char *language) {
   strncpy(user->username, username, MAX_USERNAME_LENGTH);
   user->username[MAX_USERNAME_LENGTH - 1] = '\0';
 
@@ -143,14 +150,10 @@ void initialize_user(user *user, const char *username, const char *password,
   user->language[MAX_LANGUAGE_LENGTH - 1] = '\0';
 }
 
-// Authentication
-//
-// +++++++++++++++++++++++++++++++++++++++++++++++++++++++
-//
 user *registration_phase() {
   char username[MAX_USERNAME_LENGTH], password[MAX_PASSWORD_LENGTH],
       language[MAX_LANGUAGE_LENGTH];
-  bool registration_check = 0;
+  bool is_new_user = 0;
   user *user = NULL;
 
   printf("--- Hello! Welcome to Chatlingo, register here ---\n");
@@ -163,9 +166,9 @@ user *registration_phase() {
     printf("Language: ");
     scanf("%s", language);
 
-    registration_check = register_user(username, password, language);
+    is_new_user = register_user(username, password, language);
 
-    if (registration_check == 0) {
+    if (is_new_user == 0) {
       printf("Username already exists, try again.\n");
     } else {
       printf("Welcome, you are now registered!\n");
@@ -177,12 +180,11 @@ user *registration_phase() {
         return NULL;
       }
 
-      initialize_user(user, username, password, language);
+      initialize_user_authentication(user, username, password, language);
 
       sleep(1);
-      //      system("clear");
     }
-  } while (registration_check == 0);
+  } while (is_new_user == 0);
 
   return user;
 }
@@ -232,10 +234,9 @@ user *login_phase() {
         return NULL;
       }
 
-      initialize_user(user, username, password, language);
+      initialize_user_authentication(user, username, password, language);
 
       sleep(1);
-      // system("clear");
     }
   } while (login_choice == 1 && user == NULL);
 
@@ -266,21 +267,21 @@ void login_or_registration_selection(user **user) {
 
       // Handle arrow keys (they send a sequence of characters)
       if (key == 27) { // ESC character
-        getch();       // Skip the [
+        getch();
         key = getch();
       }
 
       // Update selection based on input
       switch (key) {
-      case 65:
-      case 'k': // Up arrow or 'k'
+      case 65: // up arrow
+      case 'k':
         selected = (selected == 1) ? 2 : 1;
         break;
-      case 66:
-      case 'j': // Down arrow or 'j'
+      case 66: // down arrow
+      case 'j':
         selected = (selected == 2) ? 1 : 2;
         break;
-      case 10: // Enter key
+      case 10: // Enter
         disable_raw_mode();
         switch (selected) {
         case 1:
@@ -297,6 +298,7 @@ void login_or_registration_selection(user **user) {
 }
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+// Thread that listen for server shutdown message
 void *receive_shutdown_message_thread(void *socket_desc) {
   int sockfd = *(int *)socket_desc;
   char server_response_buffer[BUFSIZE];
@@ -449,6 +451,7 @@ int main() {
           scanf(" %c", &exit_choice);
           getchar();
 
+          // Enter the queue and wait for NOT LOCKED message from the server
           if (exit_choice != 'q') {
             system("clear");
             printf("You are in queue now, wait for your turn...\n");
@@ -468,7 +471,6 @@ int main() {
 
             server_response_buffer[num_bytes_received3] = '\0';
 
-            // qua non entra, va direttamente nell'else
             if (strcmp(server_response_buffer, "LOCKED") == 0) {
               printf("Room is full, still waiting...\n");
               sleep(1);
@@ -506,9 +508,7 @@ int main() {
     getchar();
 
     if (choice != 'y' && choice != 'Y') {
-
       sleep(1);
-      // system("clear");
       break;
     }
 

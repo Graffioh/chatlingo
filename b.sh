@@ -19,9 +19,9 @@ done
 
 if [ $DEBUG_SERVER -eq 1 ]; then
     echo "SERVER DEBUG MODE ACTIVE! (YOU NEED TO MANUALLY RUN THE CLIENT)"
-    gcc --debug -o ./server/s ./server/server.c ./hash_table/hash_table.c ./hash_table/prime.c -lm
+    gcc --debug -o ./server/s ./server/server.c ./hash_table/hash_table.c ./hash_table/prime.c ./client_queue/client_queue.c -lm
 else
-    gcc -o ./server/s ./server/server.c ./hash_table/hash_table.c ./hash_table/prime.c -lm
+    gcc -o ./server/s ./server/server.c ./hash_table/hash_table.c ./hash_table/prime.c ./client_queue/client_queue.c -lm
     ./server/s
 fi
 

@@ -13,6 +13,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "../client_queue/client_queue.h"
 #include "../hash_table/hash_table.h"
 
 #define PORT_ENGLISH_TO_ITALIAN 8080
@@ -21,8 +22,6 @@
 #define MAX_LENGTH 1000
 #define MAX_USERS_PER_ROOM 1
 #define MAX_CLIENTS 50
-
-#define MAX_QUEUE_SIZE 50
 
 typedef struct {
   ht_hash_table *english_to_italian;
@@ -40,48 +39,6 @@ pthread_mutex_t client_italian_to_english_count_mutex =
     PTHREAD_MUTEX_INITIALIZER;
 
 int server_fd_english_to_italian, server_fs_italian_to_english;
-
-typedef struct {
-  int clients[MAX_QUEUE_SIZE];
-  int front;
-  int rear;
-  int size;
-} client_queue;
-
-client_queue *create_client_q() {
-  client_queue *queue = (client_queue *)malloc(sizeof(client_queue));
-  queue->front = 0;
-  queue->rear = -1;
-  queue->size = 0;
-  return queue;
-}
-
-int is_client_q_empty(client_queue *queue) { return queue->size == 0; }
-
-int is_client_q_full(client_queue *queue) {
-  return queue->size == MAX_QUEUE_SIZE;
-}
-
-void client_enqueue(client_queue *queue, int client_socket) {
-  if (is_client_q_full(queue)) {
-    printf("Queue is full, cannot add more clients.\n");
-    return;
-  }
-  queue->rear = (queue->rear + 1) % MAX_QUEUE_SIZE;
-  queue->clients[queue->rear] = client_socket;
-  queue->size++;
-}
-
-int client_dequeue(client_queue *queue) {
-  if (is_client_q_empty(queue)) {
-    printf("Queue is empty, no clients to remove.\n");
-    return -1;
-  }
-  int client = queue->clients[queue->front];
-  queue->front = (queue->front + 1) % MAX_QUEUE_SIZE;
-  queue->size--;
-  return client;
-}
 
 client_queue *waiting_client_queue_english_to_italian;
 client_queue *waiting_client_queue_italian_to_english;
