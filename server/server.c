@@ -30,7 +30,7 @@ typedef struct {
 } vocab;
 
 int active_client_socket_list[MAX_CLIENTS] = {0};
-pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t active_clients_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 atomic_int active_english_to_italian_clients = 0;
 atomic_int active_italian_to_english_clients = 0;
@@ -83,21 +83,27 @@ int client_dequeue(client_queue *queue) {
   return client;
 }
 
-client_queue *waiting_client_queue;
+client_queue *waiting_client_queue_english_to_italian;
+client_queue *waiting_client_queue_italian_to_english;
 
-void add_client(int socket) {
-  pthread_mutex_lock(&clients_mutex);
+pthread_mutex_t waiting_clients_english_to_italian_mutex =
+    PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t waiting_clients_italian_to_english_mutex =
+    PTHREAD_MUTEX_INITIALIZER;
+
+void add_client_into_active_list(int socket) {
+  pthread_mutex_lock(&active_clients_mutex);
   for (int i = 0; i < MAX_CLIENTS; i++) {
     if (active_client_socket_list[i] == 0) {
       active_client_socket_list[i] = socket;
       break;
     }
   }
-  pthread_mutex_unlock(&clients_mutex);
+  pthread_mutex_unlock(&active_clients_mutex);
 }
 
-void remove_client(int socket) {
-  pthread_mutex_lock(&clients_mutex);
+void remove_client_from_active_list(int socket) {
+  pthread_mutex_lock(&active_clients_mutex);
   for (int i = 0; i < MAX_CLIENTS; i++) {
     if (active_client_socket_list[i] == socket) {
       active_client_socket_list[i] = 0;
@@ -105,13 +111,13 @@ void remove_client(int socket) {
       break;
     }
   }
-  pthread_mutex_unlock(&clients_mutex);
+  pthread_mutex_unlock(&active_clients_mutex);
 }
 
 void server_shutdown_handler(int sig) {
   printf("\nShutting down server...\n");
 
-  pthread_mutex_lock(&clients_mutex);
+  pthread_mutex_lock(&active_clients_mutex);
   for (int i = 0; i < MAX_CLIENTS; i++) {
     if (active_client_socket_list[i] != 0) {
       send(active_client_socket_list[i], "SERVER_SHUTDOWN",
@@ -120,7 +126,7 @@ void server_shutdown_handler(int sig) {
       active_client_socket_list[i] = 0;
     }
   }
-  pthread_mutex_unlock(&clients_mutex);
+  pthread_mutex_unlock(&active_clients_mutex);
 
   close(server_fd_english_to_italian);
   close(server_fs_italian_to_english);
@@ -244,29 +250,42 @@ typedef struct {
 //   }
 // }
 
-void broadcast_message(const char *message, int sender_socket) {
-  pthread_mutex_lock(&clients_mutex);
-  if (!is_client_q_empty(waiting_client_queue)) {
+void broadcast_message_english_to_italian(const char *message,
+                                          int sender_socket) {
+  pthread_mutex_lock(&waiting_clients_english_to_italian_mutex);
+  if (!is_client_q_empty(waiting_client_queue_english_to_italian)) {
     int next_client =
-        waiting_client_queue->clients[waiting_client_queue->front];
-    printf("NEXT CLIENT IN QUEUE TO NOTIFY: %d\n", next_client);
+        waiting_client_queue_english_to_italian
+            ->clients[waiting_client_queue_english_to_italian->front];
     send(next_client, message, strlen(message), 0);
   }
-  pthread_mutex_unlock(&clients_mutex);
+  pthread_mutex_unlock(&waiting_clients_english_to_italian_mutex);
+}
+
+void broadcast_message_italian_to_english(const char *message,
+                                          int sender_socket) {
+  pthread_mutex_lock(&waiting_clients_italian_to_english_mutex);
+  if (!is_client_q_empty(waiting_client_queue_italian_to_english)) {
+    int next_client =
+        waiting_client_queue_italian_to_english
+            ->clients[waiting_client_queue_italian_to_english->front];
+    send(next_client, message, strlen(message), 0);
+  }
+  pthread_mutex_unlock(&waiting_clients_italian_to_english_mutex);
 }
 
 void *handle_client_english_to_italian(void *arg) {
   char buffer[BUFSIZE];
   clientinfo *client_info = (clientinfo *)arg;
 
-  printf("Currently active users %d\n", active_english_to_italian_clients);
+  printf("Currently active users english -> italian %d\n",
+         active_english_to_italian_clients);
 
   if (active_english_to_italian_clients >= MAX_USERS_PER_ROOM) {
-    pthread_mutex_lock(&clients_mutex);
-    client_enqueue(waiting_client_queue, client_info->client_socket);
-    pthread_mutex_unlock(&clients_mutex);
-
-    // add_client(client_info->client_socket);
+    pthread_mutex_lock(&waiting_clients_english_to_italian_mutex);
+    client_enqueue(waiting_client_queue_english_to_italian,
+                   client_info->client_socket);
+    pthread_mutex_unlock(&waiting_clients_english_to_italian_mutex);
 
     printf("ROOM IS LOCKED! Retry again after some time...\n");
 
@@ -280,11 +299,11 @@ void *handle_client_english_to_italian(void *arg) {
   }
 
   int client_to_remove = -1;
-  pthread_mutex_lock(&clients_mutex);
-  if (!is_client_q_empty(waiting_client_queue)) {
-    client_to_remove = client_dequeue(waiting_client_queue);
+  pthread_mutex_lock(&waiting_clients_english_to_italian_mutex);
+  if (!is_client_q_empty(waiting_client_queue_english_to_italian)) {
+    client_to_remove = client_dequeue(waiting_client_queue_english_to_italian);
   }
-  pthread_mutex_unlock(&clients_mutex);
+  pthread_mutex_unlock(&waiting_clients_english_to_italian_mutex);
 
   // add_client(client_info->client_socket);
 
@@ -340,15 +359,16 @@ void *handle_client_english_to_italian(void *arg) {
       memset(buffer, 0, BUFSIZE);
       strcpy(buffer, "NOT LOCKED");
 
-      broadcast_message(buffer, client_info->client_socket);
+      broadcast_message_english_to_italian(buffer, client_info->client_socket);
 
       break;
     }
   }
 
+  // remove_client(client_info->client_socket);
+
   close(client_info->client_socket);
 
-  // remove_client(client_info->client_socket);
   pthread_mutex_lock(&client_english_to_italian_count_mutex);
   active_english_to_italian_clients--;
   pthread_mutex_unlock(&client_english_to_italian_count_mutex);
@@ -360,21 +380,42 @@ void *handle_client_italian_to_english(void *arg) {
   char buffer[BUFSIZE];
   clientinfo *client_info = (clientinfo *)arg;
 
+  printf("Currently active users italian -> english %d\n",
+         active_italian_to_english_clients);
+
   if (active_italian_to_english_clients == MAX_USERS_PER_ROOM) {
     printf("ROOM IS LOCKED! Retry again after some time...\n");
 
+    pthread_mutex_lock(&waiting_clients_italian_to_english_mutex);
+    client_enqueue(waiting_client_queue_italian_to_english,
+                   client_info->client_socket);
+    pthread_mutex_unlock(&waiting_clients_italian_to_english_mutex);
+
+    memset(buffer, 0, BUFSIZE);
+    strcpy(buffer, "LOCKED");
+
     // Send the response to the client
-    send(client_info->client_socket, "LOCKED", strlen("LOCKED"), 0);
+    send(client_info->client_socket, buffer, strlen(buffer), 0);
+
     return NULL;
   }
 
-  add_client(client_info->client_socket);
+  int client_to_remove = -1;
+  pthread_mutex_lock(&waiting_clients_italian_to_english_mutex);
+  if (!is_client_q_empty(waiting_client_queue_italian_to_english)) {
+    client_to_remove = client_dequeue(waiting_client_queue_italian_to_english);
+  }
+  pthread_mutex_unlock(&waiting_clients_italian_to_english_mutex);
+
+  // add_client(client_info->client_socket);
 
   pthread_mutex_lock(&client_italian_to_english_count_mutex);
   active_italian_to_english_clients++;
   pthread_mutex_unlock(&client_italian_to_english_count_mutex);
 
   while (1) {
+    memset(buffer, 0, BUFSIZE);
+
     // Receive data from client
     int bytes_received = recv(client_info->client_socket, buffer, BUFSIZE, 0);
     if (bytes_received <= 0) {
@@ -404,9 +445,11 @@ void *handle_client_italian_to_english(void *arg) {
 
     printf("%s\n", final_message);
 
+    memset(buffer, 0, BUFSIZE);
+    strcpy(buffer, final_message);
+
     // Send the response to the client
     send(client_info->client_socket, final_message, strlen(final_message), 0);
-
     free(translated_phrase);
     free(final_message);
 
@@ -415,13 +458,16 @@ void *handle_client_italian_to_english(void *arg) {
       printf("Client: %d requested to close the connection.\n",
              client_info->client_port);
 
-      // broadcast_message("NOT LOCKED", client_info->client_socket);
+      memset(buffer, 0, BUFSIZE);
+      strcpy(buffer, "NOT LOCKED");
+
+      broadcast_message_italian_to_english(buffer, client_info->client_socket);
 
       break;
     }
   }
 
-  remove_client(client_info->client_socket);
+  // remove_client(client_info->client_socket);
 
   close(client_info->client_socket);
 
@@ -501,8 +547,6 @@ void *room_english_to_italian(void *arg) {
 void *room_italian_to_english(void *arg) {
   vocab *v = (vocab *)arg;
 
-  ht_hash_table *ht_italian_to_english = v->italian_to_english;
-
   int client_socket;
   struct sockaddr_in client_addr;
   socklen_t addr_len = sizeof(client_addr);
@@ -515,13 +559,28 @@ void *room_italian_to_english(void *arg) {
     if ((client_socket = accept(server_fs_italian_to_english,
                                 (struct sockaddr *)&client_addr, &addr_len)) <
         0) {
-      perror("accept failed");
+      if (errno == EINTR || errno == ECONNABORTED) {
+        continue;
+      } else {
+        perror("accept failed");
+        close(server_fd_english_to_italian);
+        exit(EXIT_FAILURE);
+      }
       continue;
     }
 
     // Print connected client's information
     char client_ip[INET_ADDRSTRLEN];
     int client_port = client_addr.sin_port;
+
+    // Sending the client port back to the client
+    char port_str[20];
+    snprintf(port_str, sizeof(port_str), "PORT:%d", client_port);
+
+    memset(buffer, 0, BUFSIZE);
+    strcpy(buffer, port_str);
+
+    send(client_socket, buffer, strlen(buffer), 0);
 
     inet_ntop(AF_INET, &(client_addr.sin_addr), client_ip, INET_ADDRSTRLEN);
     printf("Client connected: IP = %s, Port = %d\n", client_ip, client_port);
@@ -575,7 +634,8 @@ void room_creation(vocab *vocabulary) {
 }
 
 int main() {
-  waiting_client_queue = create_client_q();
+  waiting_client_queue_english_to_italian = create_client_q();
+  waiting_client_queue_italian_to_english = create_client_q();
 
   struct sockaddr_in server_addr_english, server_addr_italian;
 
