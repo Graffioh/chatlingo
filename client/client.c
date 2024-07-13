@@ -390,17 +390,12 @@ int main() {
           return -1;
         }
 
-        printf("DOPO PRINTF ENTER MESSAGE\n");
-
         message_buffer[strcspn(message_buffer, "\n")] = '\0';
 
       } while (strspn(message_buffer, " \t\n\r") == strlen(message_buffer));
 
-      printf("PRIMA DI ASSEGNARE MESSAGE WITH USER\n");
       snprintf(message_with_user, sizeof(message_with_user), "%s: %s",
                user->username, message_buffer);
-
-      printf("DOPO ASSEGNARE MESSAGE WITH USER\n");
 
       message_with_user[strcspn(message_with_user, "\n")] = '\0';
 
@@ -409,8 +404,6 @@ int main() {
         perror("send failed");
         break;
       }
-
-      printf("DOPO AVER MANDATO IL MESSAGGIO AL SERVER\n");
 
       // When /ciao is sent, close current connection and go back to room
       // selection
@@ -423,8 +416,6 @@ int main() {
         sleep(1);
         break;
       }
-
-      printf("PRIMA DELLA RICEZIONE DELLA RISPOSTA DEL SERVER\n");
 
       // Receive response from server
       //
@@ -443,9 +434,7 @@ int main() {
 
       server_response_buffer[num_bytes_received2] = '\0';
 
-      printf("DOPO RICEZIONE RISPOSTA SERVER\n");
-
-      printf("Server response: %s\n", server_response_buffer);
+      // printf("Server response: %s\n", server_response_buffer);
 
       // Waiting queue if the room is full = locked
       if (strcmp(server_response_buffer, "LOCKED") == 0) {
@@ -464,8 +453,6 @@ int main() {
             system("clear");
             printf("You are in queue now, wait for your turn...\n");
 
-            printf("BEFORE QUEUE!!!!!!!!!!!!\n");
-
             memset(server_response_buffer, 0, BUFSIZE);
             int num_bytes_received3 =
                 recv(sockfd, server_response_buffer, BUFSIZE - 1, 0);
@@ -480,8 +467,6 @@ int main() {
             }
 
             server_response_buffer[num_bytes_received3] = '\0';
-
-            printf("SERVER RESPONSE AFTER QUEUE: %s\n", server_response_buffer);
 
             // qua non entra, va direttamente nell'else
             if (strcmp(server_response_buffer, "LOCKED") == 0) {
@@ -509,16 +494,10 @@ int main() {
           }
         } while (exit_choice != 'q');
 
-        printf("DOPO SCELTA LOCKED \n");
-
         if (strcmp(server_response_buffer, "LOCKED") == 0) {
           break;
         }
-
-        printf("DOPO IF LOCKED BREAK\n");
       }
-
-      printf("IF NOT LOCKED \n");
     }
 
     printf("Do you want to choose another room? (y/n): ");
