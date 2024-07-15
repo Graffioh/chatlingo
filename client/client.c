@@ -21,18 +21,21 @@
 volatile sig_atomic_t is_in_room = 0;
 time_t last_activity_time;
 pthread_mutex_t activity_mutex = PTHREAD_MUTEX_INITIALIZER;
+volatile sig_atomic_t should_kick_inactive_user = 0;
 
 volatile sig_atomic_t is_server_running = 1;
 
-// dovrebbe funzionare sta roba, da debuggare un po'
+// Inactivity thread to listen and act in case of inactivity
 void *inactivity_check_thread(void *arg) {
   while (is_in_room) {
     pthread_mutex_lock(&activity_mutex);
     time_t current_time = time(NULL);
     if (difftime(current_time, last_activity_time) >
         MAX_INACTIVE_TIME_IN_SECONDS) {
-      printf("You are now inactive. Please send a message to avoid being "
-             "kicked.\n");
+      printf("You are now inactive, you will be kicked out from the room.\n");
+      printf("Press a key to continue\n");
+      should_kick_inactive_user = 1;
+      sleep(1); // wait before kick
     }
     pthread_mutex_unlock(&activity_mutex);
     sleep(1);
@@ -415,7 +418,7 @@ int main() {
 
     // Inside the room
     //
-    while (1) {
+    while (is_in_room && !should_kick_inactive_user) {
       // Get user input
       int username_length = strlen(user->username);
       char message_with_user[BUFSIZE + username_length + 4];
@@ -548,12 +551,25 @@ int main() {
           }
         } while (exit_choice != 'q');
 
+        printf("SHOULD KICK USER? %d\n", should_kick_inactive_user);
+
         if (strcmp(server_response_buffer, "LOCKED") == 0) {
           break;
         }
       }
+
+      if (should_kick_inactive_user) {
+        printf("You have been kicked from the room due to inactivity.\n");
+        printf("Redirecting you to room selection...\n");
+        sleep(1);
+        break;
+      }
     }
 
+    should_kick_inactive_user = 0;
+    is_in_room = 0;
+
+    system("clear");
     printf("Do you want to choose another room? (y/n): ");
     char choice;
     scanf(" %c", &choice);
