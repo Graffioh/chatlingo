@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <termios.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "../auth/user_auth.h"
@@ -15,9 +16,36 @@
 #define BUFSIZE 1024
 #define GREEN_COLOR "\033[0;32m"
 #define RESET_COLOR "\033[0m"
+#define MAX_INACTIVE_TIME_IN_SECONDS 5
+
+volatile sig_atomic_t is_in_room = 0;
+time_t last_activity_time;
+pthread_mutex_t activity_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 volatile sig_atomic_t is_server_running = 1;
-volatile sig_atomic_t should_exit_queue = 0;
+
+// dovrebbe funzionare sta roba, da debuggare un po'
+void *inactivity_check_thread(void *arg) {
+  while (is_in_room) {
+    pthread_mutex_lock(&activity_mutex);
+    time_t current_time = time(NULL);
+    if (difftime(current_time, last_activity_time) >
+        MAX_INACTIVE_TIME_IN_SECONDS) {
+      printf("You are now inactive. Please send a message to avoid being "
+             "kicked.\n");
+    }
+    pthread_mutex_unlock(&activity_mutex);
+    sleep(1);
+  }
+
+  return NULL;
+}
+
+void update_activity_time() {
+  pthread_mutex_lock(&activity_mutex);
+  last_activity_time = time(NULL);
+  pthread_mutex_unlock(&activity_mutex);
+}
 
 // Functions to enable menu arrow selection
 //
@@ -301,21 +329,21 @@ void login_or_registration_selection(user **user) {
 // Thread that listen for server shutdown message
 void *receive_shutdown_message_thread(void *socket_desc) {
   int sockfd = *(int *)socket_desc;
-  char server_response_buffer[BUFSIZE];
-  int num_bytes_rec;
+  char server_shutdown_buffer[BUFSIZE];
 
   while (is_server_running) {
-    memset(server_response_buffer, 0, BUFSIZE);
-    num_bytes_rec = recv(sockfd, server_response_buffer, BUFSIZE - 1, 0);
-    if (num_bytes_rec > 0) {
-      server_response_buffer[num_bytes_rec] = '\0';
-      if (strcmp(server_response_buffer, "SERVER_SHUTDOWN") == 0) {
+    memset(server_shutdown_buffer, 0, BUFSIZE);
+    int bytes_received_shutdown =
+        recv(sockfd, server_shutdown_buffer, BUFSIZE - 1, 0);
+    if (bytes_received_shutdown > 0) {
+      server_shutdown_buffer[bytes_received_shutdown] = '\0';
+      if (strcmp(server_shutdown_buffer, "SERVER_SHUTDOWN") == 0) {
         printf("Server is shutting down. Disconnecting...\n");
         is_server_running = 0;
         break;
       }
-    } else if (num_bytes_rec == 0 ||
-               (num_bytes_rec == -1 && errno != EWOULDBLOCK &&
+    } else if (bytes_received_shutdown == 0 ||
+               (bytes_received_shutdown == -1 && errno != EWOULDBLOCK &&
                 errno != EAGAIN)) {
       printf("Server disconnected.\n");
       is_server_running = 0;
@@ -336,6 +364,7 @@ int main() {
   user *user = NULL;
 
   pthread_t server_shutdown_thread;
+  pthread_t inactivity_thread;
 
   if (pthread_create(&server_shutdown_thread, NULL,
                      receive_shutdown_message_thread, (void *)&sockfd) < 0) {
@@ -357,10 +386,10 @@ int main() {
 
     // Receive Client port from server
     memset(server_response_port_buffer, 0, BUFSIZE);
-    int num_bytes_received =
+    int bytes_received_port =
         recv(sockfd, server_response_port_buffer, BUFSIZE - 1, 0);
-    if (num_bytes_received <= 0) {
-      if (num_bytes_received == 0) {
+    if (bytes_received_port <= 0) {
+      if (bytes_received_port == 0) {
         printf("Server disconnected.\n");
       } else {
         perror("recv failed");
@@ -368,13 +397,20 @@ int main() {
       close(sockfd);
     }
 
-    server_response_port_buffer[num_bytes_received] = '\0';
+    server_response_port_buffer[bytes_received_port] = '\0';
 
     strcpy(user->user_port, server_response_port_buffer);
 
     if (sockfd < 0) {
       printf("Failed to connect. Try again.\n");
       continue;
+    }
+
+    is_in_room = 1;
+    last_activity_time = time(NULL);
+    if (pthread_create(&inactivity_thread, NULL, inactivity_check_thread,
+                       NULL) != 0) {
+      perror("Failed to create inactivity check thread");
     }
 
     // Inside the room
@@ -396,6 +432,8 @@ int main() {
 
       } while (strspn(message_buffer, " \t\n\r") == strlen(message_buffer));
 
+      update_activity_time();
+
       snprintf(message_with_user, sizeof(message_with_user), "%s: %s",
                user->username, message_buffer);
 
@@ -413,6 +451,10 @@ int main() {
           strcmp(message_buffer, "/exit") == 0) {
         printf("Disconnecting from current room. Sending you back to room "
                "selection...\n");
+
+        is_in_room = 0;
+        pthread_join(inactivity_thread, NULL);
+
         close(sockfd);
 
         sleep(1);
@@ -422,10 +464,10 @@ int main() {
       // Receive response from server
       //
       memset(server_response_buffer, 0, BUFSIZE);
-      int num_bytes_received2 =
+      int bytes_received_room_locked =
           recv(sockfd, server_response_buffer, BUFSIZE - 1, 0);
-      if (num_bytes_received2 <= 0) {
-        if (num_bytes_received2 == 0) {
+      if (bytes_received_room_locked <= 0) {
+        if (bytes_received_room_locked == 0) {
           printf("Server disconnected.\n");
         } else {
           perror("recv failed");
@@ -434,7 +476,7 @@ int main() {
         break;
       }
 
-      server_response_buffer[num_bytes_received2] = '\0';
+      server_response_buffer[bytes_received_room_locked] = '\0';
 
       // printf("Server response: %s\n", server_response_buffer);
 
@@ -444,6 +486,9 @@ int main() {
                "again after some time.\n");
         printf("If you want to select another room, choose 'q'\n");
         printf("Otherwise choose 'r' to enter in the queue\n");
+
+        is_in_room = 0;
+        pthread_join(inactivity_thread, NULL);
 
         char exit_choice;
         do {
@@ -457,10 +502,10 @@ int main() {
             printf("You are in queue now, wait for your turn...\n");
 
             memset(server_response_buffer, 0, BUFSIZE);
-            int num_bytes_received3 =
+            int bytes_received_queue =
                 recv(sockfd, server_response_buffer, BUFSIZE - 1, 0);
-            if (num_bytes_received3 <= 0) {
-              if (num_bytes_received3 == 0) {
+            if (bytes_received_queue <= 0) {
+              if (bytes_received_queue == 0) {
                 printf("Server disconnected.\n");
               } else {
                 perror("recv failed");
@@ -469,7 +514,7 @@ int main() {
               break;
             }
 
-            server_response_buffer[num_bytes_received3] = '\0';
+            server_response_buffer[bytes_received_queue] = '\0';
 
             if (strcmp(server_response_buffer, "LOCKED") == 0) {
               printf("Room is full, still waiting...\n");
@@ -490,6 +535,13 @@ int main() {
               }
 
               server_response_port_buffer[num_bytes_received] = '\0';
+
+              is_in_room = 1;
+              last_activity_time = time(NULL);
+              if (pthread_create(&inactivity_thread, NULL,
+                                 inactivity_check_thread, NULL) != 0) {
+                perror("Failed to create inactivity check thread");
+              }
 
               break;
             }

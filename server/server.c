@@ -20,7 +20,7 @@
 #define PORT_ITALIAN_TO_ENGLISH 6969
 #define BUFSIZE 1024
 #define MAX_LENGTH 1000
-#define MAX_USERS_PER_ROOM 1
+#define MAX_USERS_PER_ROOM 2
 #define MAX_CLIENTS 50
 
 typedef struct {
@@ -232,7 +232,7 @@ void broadcast_message_italian_to_english(const char *message,
 }
 
 void *handle_client_english_to_italian(void *arg) {
-  char buffer[BUFSIZE];
+  char client_english_to_italian_buffer[BUFSIZE];
   clientinfo *client_info = (clientinfo *)arg;
 
   printf("Currently active users english -> italian %d\n",
@@ -246,11 +246,12 @@ void *handle_client_english_to_italian(void *arg) {
 
     printf("ROOM IS LOCKED! Retry again after some time...\n");
 
-    memset(buffer, 0, BUFSIZE);
-    strcpy(buffer, "LOCKED");
+    memset(client_english_to_italian_buffer, 0, BUFSIZE);
+    strcpy(client_english_to_italian_buffer, "LOCKED");
 
     // Send the response to the client
-    send(client_info->client_socket, buffer, strlen(buffer), 0);
+    send(client_info->client_socket, client_english_to_italian_buffer,
+         strlen(client_english_to_italian_buffer), 0);
 
     return NULL;
   }
@@ -269,12 +270,14 @@ void *handle_client_english_to_italian(void *arg) {
   pthread_mutex_unlock(&client_english_to_italian_count_mutex);
 
   while (1) {
-    memset(buffer, 0, BUFSIZE);
+    memset(client_english_to_italian_buffer, 0, BUFSIZE);
 
-    // Receive data from client
-    int bytes_received = recv(client_info->client_socket, buffer, BUFSIZE, 0);
-    if (bytes_received <= 0) {
-      if (bytes_received == 0) {
+    // Receive message from client
+    int bytes_received_message =
+        recv(client_info->client_socket, client_english_to_italian_buffer,
+             BUFSIZE, 0);
+    if (bytes_received_message <= 0) {
+      if (bytes_received_message == 0) {
         printf("Client: %d disconnected\n", client_info->client_port);
       } else {
         perror("recv failed");
@@ -282,11 +285,15 @@ void *handle_client_english_to_italian(void *arg) {
       break;
     }
 
-    buffer[bytes_received] = '\0';
+    client_english_to_italian_buffer[bytes_received_message] = '\0';
+
+    if (strcmp(client_english_to_italian_buffer, "INACTIVE") == 0) {
+      close(client_info->client_socket);
+    }
     // printf("Received from client %s: %s\n", client_ip, buffer);
 
     // Remove the user: and read only the message
-    char *message_without_user = strchr(buffer, ':');
+    char *message_without_user = strchr(client_english_to_italian_buffer, ':');
     if (message_without_user != NULL) {
       message_without_user += 2;
     }
@@ -296,15 +303,17 @@ void *handle_client_english_to_italian(void *arg) {
         client_info->vocabulary->english_to_italian, message_without_user);
 
     // Reattach the username
-    char *final_message = reattach_username(buffer, translated_phrase);
+    char *final_message =
+        reattach_username(client_english_to_italian_buffer, translated_phrase);
 
     printf("%s\n", final_message);
 
-    memset(buffer, 0, BUFSIZE);
-    strcpy(buffer, final_message);
+    memset(client_english_to_italian_buffer, 0, BUFSIZE);
+    strcpy(client_english_to_italian_buffer, final_message);
 
     // Send the response to the client
-    send(client_info->client_socket, buffer, strlen(buffer), 0);
+    send(client_info->client_socket, client_english_to_italian_buffer,
+         strlen(client_english_to_italian_buffer), 0);
     free(translated_phrase);
     free(final_message);
 
@@ -313,10 +322,11 @@ void *handle_client_english_to_italian(void *arg) {
       printf("Client: %d requested to close the connection.\n",
              client_info->client_port);
 
-      memset(buffer, 0, BUFSIZE);
-      strcpy(buffer, "NOT LOCKED");
+      memset(client_english_to_italian_buffer, 0, BUFSIZE);
+      strcpy(client_english_to_italian_buffer, "NOT LOCKED");
 
-      broadcast_message_english_to_italian(buffer, client_info->client_socket);
+      broadcast_message_english_to_italian(client_english_to_italian_buffer,
+                                           client_info->client_socket);
 
       break;
     }
@@ -334,7 +344,7 @@ void *handle_client_english_to_italian(void *arg) {
 }
 
 void *handle_client_italian_to_english(void *arg) {
-  char buffer[BUFSIZE];
+  char client_italian_to_english_buffer[BUFSIZE];
   clientinfo *client_info = (clientinfo *)arg;
 
   printf("Currently active users italian -> english %d\n",
@@ -348,11 +358,12 @@ void *handle_client_italian_to_english(void *arg) {
                    client_info->client_socket);
     pthread_mutex_unlock(&waiting_clients_italian_to_english_mutex);
 
-    memset(buffer, 0, BUFSIZE);
-    strcpy(buffer, "LOCKED");
+    memset(client_italian_to_english_buffer, 0, BUFSIZE);
+    strcpy(client_italian_to_english_buffer, "LOCKED");
 
     // Send the response to the client
-    send(client_info->client_socket, buffer, strlen(buffer), 0);
+    send(client_info->client_socket, client_italian_to_english_buffer,
+         strlen(client_italian_to_english_buffer), 0);
 
     return NULL;
   }
@@ -371,12 +382,14 @@ void *handle_client_italian_to_english(void *arg) {
   pthread_mutex_unlock(&client_italian_to_english_count_mutex);
 
   while (1) {
-    memset(buffer, 0, BUFSIZE);
+    memset(client_italian_to_english_buffer, 0, BUFSIZE);
 
     // Receive data from client
-    int bytes_received = recv(client_info->client_socket, buffer, BUFSIZE, 0);
-    if (bytes_received <= 0) {
-      if (bytes_received == 0) {
+    int bytes_received_message =
+        recv(client_info->client_socket, client_italian_to_english_buffer,
+             BUFSIZE, 0);
+    if (bytes_received_message <= 0) {
+      if (bytes_received_message == 0) {
         printf("Client: %d disconnected\n", client_info->client_port);
       } else {
         perror("recv failed");
@@ -384,11 +397,11 @@ void *handle_client_italian_to_english(void *arg) {
       break;
     }
 
-    buffer[bytes_received] = '\0';
+    client_italian_to_english_buffer[bytes_received_message] = '\0';
     // printf("Received from client %s: %s\n", client_ip, buffer);
 
     // Remove the user: and read only the message
-    char *message_without_user = strchr(buffer, ':');
+    char *message_without_user = strchr(client_italian_to_english_buffer, ':');
     if (message_without_user != NULL) {
       message_without_user += 2;
     }
@@ -398,12 +411,13 @@ void *handle_client_italian_to_english(void *arg) {
         client_info->vocabulary->italian_to_english, message_without_user);
 
     // Reattach the username
-    char *final_message = reattach_username(buffer, translated_phrase);
+    char *final_message =
+        reattach_username(client_italian_to_english_buffer, translated_phrase);
 
     printf("%s\n", final_message);
 
-    memset(buffer, 0, BUFSIZE);
-    strcpy(buffer, final_message);
+    memset(client_italian_to_english_buffer, 0, BUFSIZE);
+    strcpy(client_italian_to_english_buffer, final_message);
 
     // Send the response to the client
     send(client_info->client_socket, final_message, strlen(final_message), 0);
@@ -415,10 +429,11 @@ void *handle_client_italian_to_english(void *arg) {
       printf("Client: %d requested to close the connection.\n",
              client_info->client_port);
 
-      memset(buffer, 0, BUFSIZE);
-      strcpy(buffer, "NOT LOCKED");
+      memset(client_italian_to_english_buffer, 0, BUFSIZE);
+      strcpy(client_italian_to_english_buffer, "NOT LOCKED");
 
-      broadcast_message_italian_to_english(buffer, client_info->client_socket);
+      broadcast_message_italian_to_english(client_italian_to_english_buffer,
+                                           client_info->client_socket);
 
       break;
     }
@@ -447,7 +462,7 @@ void *room_english_to_italian(void *arg) {
   int client_socket;
   struct sockaddr_in client_addr;
   socklen_t addr_len = sizeof(client_addr);
-  char buffer[BUFSIZE];
+  char room_english_to_italian_buffer[BUFSIZE];
 
   char *translated_str = NULL;
 
@@ -474,10 +489,11 @@ void *room_english_to_italian(void *arg) {
     char port_str[20];
     snprintf(port_str, sizeof(port_str), "PORT:%d", client_port);
 
-    memset(buffer, 0, BUFSIZE);
-    strcpy(buffer, port_str);
+    memset(room_english_to_italian_buffer, 0, BUFSIZE);
+    strcpy(room_english_to_italian_buffer, port_str);
 
-    send(client_socket, buffer, strlen(buffer), 0);
+    send(client_socket, room_english_to_italian_buffer,
+         strlen(room_english_to_italian_buffer), 0);
 
     inet_ntop(AF_INET, &(client_addr.sin_addr), client_ip, INET_ADDRSTRLEN);
     printf("Client connected: IP = %s, Port = %d\n", client_ip, client_port);
@@ -507,7 +523,7 @@ void *room_italian_to_english(void *arg) {
   int client_socket;
   struct sockaddr_in client_addr;
   socklen_t addr_len = sizeof(client_addr);
-  char buffer[BUFSIZE];
+  char room_italian_to_english_buffer[BUFSIZE];
 
   char *translated_str = NULL;
 
@@ -534,10 +550,11 @@ void *room_italian_to_english(void *arg) {
     char port_str[20];
     snprintf(port_str, sizeof(port_str), "PORT:%d", client_port);
 
-    memset(buffer, 0, BUFSIZE);
-    strcpy(buffer, port_str);
+    memset(room_italian_to_english_buffer, 0, BUFSIZE);
+    strcpy(room_italian_to_english_buffer, port_str);
 
-    send(client_socket, buffer, strlen(buffer), 0);
+    send(client_socket, room_italian_to_english_buffer,
+         strlen(room_italian_to_english_buffer), 0);
 
     inet_ntop(AF_INET, &(client_addr.sin_addr), client_ip, INET_ADDRSTRLEN);
     printf("Client connected: IP = %s, Port = %d\n", client_ip, client_port);
