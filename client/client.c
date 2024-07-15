@@ -23,6 +23,8 @@ atomic_bool is_in_room = ATOMIC_VAR_INIT(false);
 atomic_bool should_kick_inactive_user = ATOMIC_VAR_INIT(false);
 atomic_bool is_server_running = ATOMIC_VAR_INIT(true);
 
+pthread_t inactivity_thread;
+
 time_t last_activity_time;
 pthread_mutex_t activity_mutex = PTHREAD_MUTEX_INITIALIZER;
 // Inactivity thread to listen and act in case of inactivity
@@ -367,7 +369,6 @@ int main() {
   user *user = NULL;
 
   pthread_t server_shutdown_thread;
-  pthread_t inactivity_thread;
 
   if (pthread_create(&server_shutdown_thread, NULL,
                      receive_shutdown_message_thread, (void *)&sockfd) < 0) {
