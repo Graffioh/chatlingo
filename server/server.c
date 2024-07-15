@@ -263,8 +263,6 @@ void *handle_client_english_to_italian(void *arg) {
   }
   pthread_mutex_unlock(&waiting_clients_english_to_italian_mutex);
 
-  // add_client(client_info->client_socket);
-
   pthread_mutex_lock(&client_english_to_italian_count_mutex);
   active_english_to_italian_clients++;
   pthread_mutex_unlock(&client_english_to_italian_count_mutex);
@@ -287,9 +285,16 @@ void *handle_client_english_to_italian(void *arg) {
 
     client_english_to_italian_buffer[bytes_received_message] = '\0';
 
-    if (strcmp(client_english_to_italian_buffer, "INACTIVE") == 0) {
-      close(client_info->client_socket);
+    if (strcmp(client_english_to_italian_buffer, "KICKED") == 0) {
+      memset(client_english_to_italian_buffer, 0, BUFSIZE);
+      strcpy(client_english_to_italian_buffer, "NOT LOCKED");
+
+      broadcast_message_english_to_italian(client_english_to_italian_buffer,
+                                           client_info->client_socket);
+
+      break;
     }
+
     // printf("Received from client %s: %s\n", client_ip, buffer);
 
     // Remove the user: and read only the message
@@ -317,6 +322,8 @@ void *handle_client_english_to_italian(void *arg) {
     free(translated_phrase);
     free(final_message);
 
+    printf("MESSAGE WITHOUT USER: %s\n", message_without_user);
+
     if (strcmp(message_without_user, "/ciao") == 0 ||
         strcmp(message_without_user, "/exit") == 0) {
       printf("Client: %d requested to close the connection.\n",
@@ -331,8 +338,6 @@ void *handle_client_english_to_italian(void *arg) {
       break;
     }
   }
-
-  // remove_client(client_info->client_socket);
 
   close(client_info->client_socket);
 
@@ -374,8 +379,6 @@ void *handle_client_italian_to_english(void *arg) {
     client_to_remove = client_dequeue(waiting_client_queue_italian_to_english);
   }
   pthread_mutex_unlock(&waiting_clients_italian_to_english_mutex);
-
-  // add_client(client_info->client_socket);
 
   pthread_mutex_lock(&client_italian_to_english_count_mutex);
   active_italian_to_english_clients++;
@@ -438,8 +441,6 @@ void *handle_client_italian_to_english(void *arg) {
       break;
     }
   }
-
-  // remove_client(client_info->client_socket);
 
   close(client_info->client_socket);
 

@@ -19,9 +19,9 @@
 #define RESET_COLOR "\033[0m"
 #define MAX_INACTIVE_TIME_IN_SECONDS 5
 
-atomic_bool is_in_room = ATOMIC_VAR_INIT(false);
-atomic_bool should_kick_inactive_user = ATOMIC_VAR_INIT(false);
-atomic_bool is_server_running = ATOMIC_VAR_INIT(true);
+atomic_bool is_in_room = false;
+atomic_bool should_kick_inactive_user = false;
+atomic_bool is_server_running = true;
 
 pthread_t inactivity_thread;
 
@@ -37,7 +37,7 @@ void *inactivity_check_thread(void *arg) {
       printf("You are now inactive, you will be kicked out from the room.\n");
       printf("Press a key to continue\n");
       atomic_store(&should_kick_inactive_user, true);
-      sleep(1); // wait before kick
+      // sleep(1)
     }
     pthread_mutex_unlock(&activity_mutex);
     sleep(1);
@@ -332,33 +332,33 @@ void login_or_registration_selection(user **user) {
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 // Thread that listen for server shutdown message
-void *receive_shutdown_message_thread(void *socket_desc) {
-  int sockfd = *(int *)socket_desc;
-  char server_shutdown_buffer[BUFSIZE];
-
-  while (atomic_load(&is_server_running)) {
-    memset(server_shutdown_buffer, 0, BUFSIZE);
-    int bytes_received_shutdown =
-        recv(sockfd, server_shutdown_buffer, BUFSIZE - 1, 0);
-    if (bytes_received_shutdown > 0) {
-      server_shutdown_buffer[bytes_received_shutdown] = '\0';
-      if (strcmp(server_shutdown_buffer, "SERVER_SHUTDOWN") == 0) {
-        printf("Server is shutting down. Disconnecting...\n");
-        atomic_store(&is_server_running, false);
-        break;
-      }
-    } else if (bytes_received_shutdown == 0 ||
-               (bytes_received_shutdown == -1 && errno != EWOULDBLOCK &&
-                errno != EAGAIN)) {
-      printf("Server disconnected.\n");
-      atomic_store(&is_server_running, false);
-      break;
-    }
-  }
-
-  close(sockfd);
-  return NULL;
-}
+// void *receive_shutdown_message_thread(void *socket_desc) {
+//  int sockfd = *(int *)socket_desc;
+//  char server_shutdown_buffer[BUFSIZE];
+//
+//  while (atomic_load(&is_server_running)) {
+//    memset(server_shutdown_buffer, 0, BUFSIZE);
+//    int bytes_received_shutdown =
+//        recv(sockfd, server_shutdown_buffer, BUFSIZE - 1, 0);
+//    if (bytes_received_shutdown > 0) {
+//      server_shutdown_buffer[bytes_received_shutdown] = '\0';
+//      if (strcmp(server_shutdown_buffer, "SERVER_SHUTDOWN") == 0) {
+//        printf("Server is shutting down. Disconnecting...\n");
+//        atomic_store(&is_server_running, false);
+//        break;
+//      }
+//    } else if (bytes_received_shutdown == 0 ||
+//               (bytes_received_shutdown == -1 && errno != EWOULDBLOCK &&
+//                errno != EAGAIN)) {
+//      printf("Server disconnected.\n");
+//      atomic_store(&is_server_running, false);
+//      break;
+//    }
+//  }
+//
+//  close(sockfd);
+//  return NULL;
+//}
 
 int main() {
   int sockfd;
@@ -368,13 +368,13 @@ int main() {
   int room_choice;
   user *user = NULL;
 
-  pthread_t server_shutdown_thread;
+  // pthread_t server_shutdown_thread;
 
-  if (pthread_create(&server_shutdown_thread, NULL,
-                     receive_shutdown_message_thread, (void *)&sockfd) < 0) {
-    perror("Could not create receive thread");
-    close(sockfd);
-  }
+  // if (pthread_create(&server_shutdown_thread, NULL,
+  //                    receive_shutdown_message_thread, (void *)&sockfd) < 0) {
+  //   perror("Could not create receive thread");
+  //   close(sockfd);
+  // }
 
   // while (is_server_running) {
   while (1) {
@@ -410,7 +410,7 @@ int main() {
       continue;
     }
 
-    is_in_room = 1;
+    atomic_store(&is_in_room, true);
     last_activity_time = time(NULL);
     if (pthread_create(&inactivity_thread, NULL, inactivity_check_thread,
                        NULL) != 0) {
@@ -457,7 +457,7 @@ int main() {
         printf("Disconnecting from current room. Sending you back to room "
                "selection...\n");
 
-        is_in_room = 0;
+        atomic_store(&is_in_room, false);
         pthread_join(inactivity_thread, NULL);
 
         close(sockfd);
@@ -492,7 +492,7 @@ int main() {
         printf("If you want to select another room, choose 'q'\n");
         printf("Otherwise choose 'r' to enter in the queue\n");
 
-        is_in_room = 0;
+        atomic_store(&is_in_room, false);
         pthread_join(inactivity_thread, NULL);
 
         char exit_choice;
@@ -541,7 +541,7 @@ int main() {
 
               server_response_port_buffer[num_bytes_received] = '\0';
 
-              is_in_room = 1;
+              atomic_store(&is_in_room, true);
               last_activity_time = time(NULL);
               if (pthread_create(&inactivity_thread, NULL,
                                  inactivity_check_thread, NULL) != 0) {
@@ -553,16 +553,23 @@ int main() {
           }
         } while (exit_choice != 'q');
 
-        printf("SHOULD KICK USER? %d\n", should_kick_inactive_user);
-
         if (strcmp(server_response_buffer, "LOCKED") == 0) {
           break;
         }
       }
 
-      if (should_kick_inactive_user) {
+      if (atomic_load(&should_kick_inactive_user)) {
         printf("You have been kicked from the room due to inactivity.\n");
         printf("Redirecting you to room selection...\n");
+
+        memset(message_buffer, 0, BUFSIZE);
+        strcpy(message_buffer, "KICKED");
+
+        if (send(sockfd, message_buffer, strlen(message_buffer), 0) < 0) {
+          perror("send failed");
+          break;
+        }
+
         sleep(1);
         break;
       }
@@ -591,7 +598,8 @@ int main() {
     sleep(1);
   }
 
-  pthread_join(server_shutdown_thread, NULL);
+  pthread_join(inactivity_thread, NULL);
+  // pthread_join(server_shutdown_thread, NULL);
 
   return 0;
 }
