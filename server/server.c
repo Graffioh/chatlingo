@@ -284,6 +284,7 @@ void *handle_client_english_to_italian(void *arg) {
     }
 
     client_english_to_italian_buffer[bytes_received_message] = '\0';
+    // printf("Received from client %s: %s\n", client_ip, buffer);
 
     if (strcmp(client_english_to_italian_buffer, "KICKED") == 0) {
       memset(client_english_to_italian_buffer, 0, BUFSIZE);
@@ -294,8 +295,6 @@ void *handle_client_english_to_italian(void *arg) {
 
       break;
     }
-
-    // printf("Received from client %s: %s\n", client_ip, buffer);
 
     // Remove the user: and read only the message
     char *message_without_user = strchr(client_english_to_italian_buffer, ':');
@@ -402,6 +401,16 @@ void *handle_client_italian_to_english(void *arg) {
 
     client_italian_to_english_buffer[bytes_received_message] = '\0';
     // printf("Received from client %s: %s\n", client_ip, buffer);
+
+    if (strcmp(client_italian_to_english_buffer, "KICKED") == 0) {
+      memset(client_italian_to_english_buffer, 0, BUFSIZE);
+      strcpy(client_italian_to_english_buffer, "NOT LOCKED");
+
+      broadcast_message_english_to_italian(client_italian_to_english_buffer,
+                                           client_info->client_socket);
+
+      break;
+    }
 
     // Remove the user: and read only the message
     char *message_without_user = strchr(client_italian_to_english_buffer, ':');
