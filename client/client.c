@@ -1,6 +1,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,23 +19,22 @@
 #define RESET_COLOR "\033[0m"
 #define MAX_INACTIVE_TIME_IN_SECONDS 5
 
-volatile sig_atomic_t is_in_room = 0;
+atomic_bool is_in_room = ATOMIC_VAR_INIT(false);
+atomic_bool should_kick_inactive_user = ATOMIC_VAR_INIT(false);
+atomic_bool is_server_running = ATOMIC_VAR_INIT(true);
+
 time_t last_activity_time;
 pthread_mutex_t activity_mutex = PTHREAD_MUTEX_INITIALIZER;
-volatile sig_atomic_t should_kick_inactive_user = 0;
-
-volatile sig_atomic_t is_server_running = 1;
-
 // Inactivity thread to listen and act in case of inactivity
 void *inactivity_check_thread(void *arg) {
-  while (is_in_room) {
+  while (atomic_load(&is_in_room)) {
     pthread_mutex_lock(&activity_mutex);
     time_t current_time = time(NULL);
     if (difftime(current_time, last_activity_time) >
         MAX_INACTIVE_TIME_IN_SECONDS) {
       printf("You are now inactive, you will be kicked out from the room.\n");
       printf("Press a key to continue\n");
-      should_kick_inactive_user = 1;
+      atomic_store(&should_kick_inactive_user, true);
       sleep(1); // wait before kick
     }
     pthread_mutex_unlock(&activity_mutex);
@@ -334,7 +334,7 @@ void *receive_shutdown_message_thread(void *socket_desc) {
   int sockfd = *(int *)socket_desc;
   char server_shutdown_buffer[BUFSIZE];
 
-  while (is_server_running) {
+  while (atomic_load(&is_server_running)) {
     memset(server_shutdown_buffer, 0, BUFSIZE);
     int bytes_received_shutdown =
         recv(sockfd, server_shutdown_buffer, BUFSIZE - 1, 0);
@@ -342,14 +342,14 @@ void *receive_shutdown_message_thread(void *socket_desc) {
       server_shutdown_buffer[bytes_received_shutdown] = '\0';
       if (strcmp(server_shutdown_buffer, "SERVER_SHUTDOWN") == 0) {
         printf("Server is shutting down. Disconnecting...\n");
-        is_server_running = 0;
+        atomic_store(&is_server_running, false);
         break;
       }
     } else if (bytes_received_shutdown == 0 ||
                (bytes_received_shutdown == -1 && errno != EWOULDBLOCK &&
                 errno != EAGAIN)) {
       printf("Server disconnected.\n");
-      is_server_running = 0;
+      atomic_store(&is_server_running, false);
       break;
     }
   }
@@ -418,7 +418,8 @@ int main() {
 
     // Inside the room
     //
-    while (is_in_room && !should_kick_inactive_user) {
+    while (atomic_load(&is_in_room) &&
+           !atomic_load(&should_kick_inactive_user)) {
       // Get user input
       int username_length = strlen(user->username);
       char message_with_user[BUFSIZE + username_length + 4];
@@ -566,8 +567,8 @@ int main() {
       }
     }
 
-    should_kick_inactive_user = 0;
-    is_in_room = 0;
+    atomic_store(&should_kick_inactive_user, false);
+    atomic_store(&is_in_room, false);
 
     system("clear");
 
@@ -589,7 +590,7 @@ int main() {
     sleep(1);
   }
 
-  pthread_join((void *)receive_shutdown_message_thread, NULL);
+  pthread_join(server_shutdown_thread, NULL);
 
   return 0;
 }
