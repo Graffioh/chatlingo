@@ -570,12 +570,17 @@ int main() {
     is_in_room = 0;
 
     system("clear");
-    printf("Do you want to choose another room? (y/n): ");
+
+    printf("Do you want to choose another room?\n");
+    printf("if not you will exit from the chat!\n");
+    printf("(y/n): ");
     char choice;
     scanf(" %c", &choice);
     getchar();
 
     if (choice != 'y' && choice != 'Y') {
+      sleep(1);
+      printf("Exiting...\n");
       sleep(1);
       break;
     }
