@@ -27,6 +27,7 @@ pthread_t inactivity_thread;
 
 time_t last_activity_time;
 pthread_mutex_t activity_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 // Inactivity thread to listen and act in case of inactivity
 void *inactivity_check_thread(void *arg) {
   while (atomic_load(&is_in_room)) {
@@ -34,10 +35,10 @@ void *inactivity_check_thread(void *arg) {
     time_t current_time = time(NULL);
     if (difftime(current_time, last_activity_time) >
         MAX_INACTIVE_TIME_IN_SECONDS) {
-      printf("You are now inactive, you will be kicked out from the room.\n");
+      system("clear");
+      printf("You are now inactive, you are kicked out from the room!!!\n");
       printf("Press a key to continue\n");
       atomic_store(&should_kick_inactive_user, true);
-      // sleep(1)
     }
     pthread_mutex_unlock(&activity_mutex);
     sleep(1);
@@ -363,7 +364,6 @@ void login_or_registration_selection(user **user) {
 int main() {
   int sockfd;
   char server_response_buffer[BUFSIZE];
-  char server_response_port_buffer[BUFSIZE];
   char message_buffer[BUFSIZE];
   int room_choice;
   user *user = NULL;
@@ -387,23 +387,6 @@ int main() {
     room_choice = choose_room();
     fflush(stdin);
     sockfd = connect_to_server(room_choice);
-
-    // Receive Client port from server
-    memset(server_response_port_buffer, 0, BUFSIZE);
-    int bytes_received_port =
-        recv(sockfd, server_response_port_buffer, BUFSIZE - 1, 0);
-    if (bytes_received_port <= 0) {
-      if (bytes_received_port == 0) {
-        printf("Server disconnected.\n");
-      } else {
-        perror("recv failed");
-      }
-      close(sockfd);
-    }
-
-    server_response_port_buffer[bytes_received_port] = '\0';
-
-    strcpy(user->user_port, server_response_port_buffer);
 
     if (sockfd < 0) {
       printf("Failed to connect. Try again.\n");
@@ -526,20 +509,6 @@ int main() {
               sleep(1);
             } else {
               sockfd = connect_to_server(room_choice);
-
-              memset(server_response_port_buffer, 0, BUFSIZE);
-              int num_bytes_received =
-                  recv(sockfd, server_response_port_buffer, BUFSIZE - 1, 0);
-              if (num_bytes_received <= 0) {
-                if (num_bytes_received == 0) {
-                  printf("Server disconnected.\n");
-                } else {
-                  perror("recv failed");
-                }
-                close(sockfd);
-              }
-
-              server_response_port_buffer[num_bytes_received] = '\0';
 
               atomic_store(&is_in_room, true);
               last_activity_time = time(NULL);
