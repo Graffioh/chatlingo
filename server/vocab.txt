@@ -1,4 +1,6 @@
+Hi,Ciao
 Hello,Ciao
+Alone,Solo
 Alright,Va bene
 Cool,Figo
 Thing,Cosa
@@ -13,7 +15,9 @@ This,Questo
 Here,Qui
 There,Lì
 Yes,Sì
+Don't,No
 No,No
+And,E
 Please,Per favore
 Thanks,Grazie
 Sorry,Scusa
@@ -22,6 +26,7 @@ Bad,Cattivo
 Beautiful,Bello
 Ugly,Brutto
 Good,Buono
+Again,Nuovamente
 Hungry,Affamato
 Help,Aiuto
 Why,Perché
@@ -327,7 +332,8 @@ Similar,Simile
 Opposite,Opposto
 be,Essere
 Am,Sono
-Are,Sei
-Has, Ha
+Are,Stare
+Have,Avere
+Has,Ha
 Foot,Piede
 Feet,Piedi

@@ -1,10 +1,4 @@
-marco,concilio,africano
 graffioh,graffioh,italian
-a,a,a
-w,w,w
-aa,aa,aa
+a,a,algerian
+w,w,english
 q,q,q
-e,e,e
-f,f,f
-h,h,h
-z,z,z

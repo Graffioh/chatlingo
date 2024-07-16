@@ -19,7 +19,7 @@
 #define PORT_ITALIAN_TO_ENGLISH 6969
 #define BUFSIZE 1024
 #define MAX_LENGTH 1000
-#define MAX_USERS_PER_ROOM 1
+#define MAX_USERS_PER_ROOM 2
 #define MAX_CLIENTS 50
 
 typedef struct {
@@ -183,7 +183,9 @@ void *handle_client_english_to_italian(void *arg) {
                    client_info->client_socket);
     pthread_mutex_unlock(&waiting_clients_english_to_italian_mutex);
 
-    printf("ROOM IS LOCKED! Retry again after some time...\n");
+    printf("\033[33m"
+           "A user tried to enter the room, but it's full...\n"
+           "\033[0m");
 
     memset(client_english_to_italian_buffer, 0, BUFSIZE);
     strcpy(client_english_to_italian_buffer, "LOCKED");
@@ -278,7 +280,9 @@ void *handle_client_italian_to_english(void *arg) {
   clientinfo *client_info = (clientinfo *)arg;
 
   if (active_italian_to_english_clients == MAX_USERS_PER_ROOM) {
-    printf("ROOM IS LOCKED! Retry again after some time...\n");
+    printf("\033[33m"
+           "A user tried to enter the room, but it's full...\n"
+           "\033[0m");
 
     pthread_mutex_lock(&waiting_clients_italian_to_english_mutex);
     client_enqueue(waiting_client_queue_italian_to_english,
@@ -571,10 +575,14 @@ int main() {
     exit(EXIT_FAILURE);
   }
 
+  printf("---------------------------------------------------------------------"
+         "----------------------------------\n");
   printf("TCP Chat Server is listening on ports %d (English to Italian Room) "
          "and %d "
-         "(Italian to English Room)...\n",
+         "(Italian to English Room)\n",
          PORT_ENGLISH_TO_ITALIAN, PORT_ITALIAN_TO_ENGLISH);
+  printf("---------------------------------------------------------------------"
+         "----------------------------------\n");
 
   vocab *vocabulary = malloc(sizeof(vocab));
   vocabulary = vocab_setup_from_txt();

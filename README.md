@@ -1,2 +1,20 @@
 # chatlingo
--
+
+Client-Server chat app implemented with sockets and a TCP connection
+
+Enter in a room, and chat with others, but there is a catch, based on the room your messages will be translated!
+
+The translation is really basic, because it was not the purpose of this project, the vocabulary is implemented with an hash table to ensure O(1) time complexity for search operations.
+
+User authentication via a simple .txt file.
+
+Everything is multi-threaded, so rooms, multiple clients and inactivity detection mechanism.
+
+## Features
+
+- User authentication
+- 2 Chat rooms (English -> Italian and viceversa)
+- Full room queue
+- Inactivity kick
+
+

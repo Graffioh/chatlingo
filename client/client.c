@@ -17,7 +17,7 @@
 #define BUFSIZE 1024
 #define GREEN_COLOR "\033[0;32m"
 #define RESET_COLOR "\033[0m"
-#define MAX_INACTIVE_TIME_IN_SECONDS 5
+#define MAX_INACTIVE_TIME_IN_SECONDS 10
 
 atomic_bool is_in_room = false;
 atomic_bool should_kick_inactive_user = false;
@@ -117,8 +117,12 @@ int connect_to_server(int room_choice) {
     return -1;
   }
 
+  system("clear");
+
   printf("Connected to %s room\n",
          room_choice == 1 ? "English to Italian" : "Italian to English");
+  printf("Start chatting and enjoy!\n");
+  printf("-------------------------------------------\n");
 
   return sockfd;
 }
@@ -133,7 +137,7 @@ int choose_room() {
     system("clear");
 
     // Display menu
-    printf("Choose a room:\n");
+    printf("--- Room selection ---\n");
     printf("%s%c%s English to Italian\n", selected == 1 ? GREEN_COLOR : "",
            selected == 1 ? '>' : ' ', RESET_COLOR);
     printf("%s%c%s Italian to English\n", selected == 2 ? GREEN_COLOR : "",
@@ -171,19 +175,6 @@ int choose_room() {
 //
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
-void initialize_user_authentication(user *user, const char *username,
-                                    const char *password,
-                                    const char *language) {
-  strncpy(user->username, username, MAX_USERNAME_LENGTH);
-  user->username[MAX_USERNAME_LENGTH - 1] = '\0';
-
-  strncpy(user->password, password, MAX_PASSWORD_LENGTH);
-  user->password[MAX_PASSWORD_LENGTH - 1] = '\0';
-
-  strncpy(user->language, language, MAX_LANGUAGE_LENGTH);
-  user->language[MAX_LANGUAGE_LENGTH - 1] = '\0';
-}
-
 user *registration_phase() {
   char username[MAX_USERNAME_LENGTH], password[MAX_PASSWORD_LENGTH],
       language[MAX_LANGUAGE_LENGTH];
@@ -355,7 +346,7 @@ int main() {
       int username_length = strlen(user->username);
       char message_with_user[BUFSIZE + username_length + 4];
 
-      // loop till the message is empty or only contains whitespace
+      // Loop till the message is empty or only contains whitespace
       do {
         printf("Enter message: ");
         if (fgets(message_buffer, BUFSIZE, stdin) == NULL) {
@@ -377,8 +368,6 @@ int main() {
         snprintf(message_with_user, sizeof(message_with_user), "%s (%s): %s",
                  user->username, user->language, message_buffer);
       }
-
-      printf("LANGUAGE: %s\n", user->language);
 
       message_with_user[strcspn(message_with_user, "\n")] = '\0';
 
@@ -426,6 +415,7 @@ int main() {
       if (strcmp(server_response_buffer, "LOCKED") == 0) {
         printf("Can't send the message because the server room is full, try "
                "again after some time.\n");
+        printf("---------------------------------------------------------\n");
         printf("If you want to select another room, choose 'q'\n");
         printf("Otherwise choose 'r' to enter in the queue\n");
 
@@ -522,7 +512,6 @@ int main() {
   }
 
   pthread_join(inactivity_thread, NULL);
-  // pthread_join(server_shutdown_thread, NULL);
 
   return 0;
 }
