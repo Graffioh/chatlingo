@@ -17,6 +17,13 @@ Everything is multi-threaded, so rooms, multiple clients and inactivity detectio
 - Full room queue
 - Inactivity kick
 
+## How to run
+
+To get started
+- Run b.sh (it will compile and run the server)
+- Open a new terminal window
+- Run /client/c (as many as you want)
+
 ## Demo
 
 https://github.com/user-attachments/assets/1b83271f-7c5d-47d4-9880-f0788c2eefab
