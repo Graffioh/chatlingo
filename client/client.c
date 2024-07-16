@@ -200,25 +200,17 @@ user *registration_phase() {
     printf("Language: ");
     scanf("%s", language);
 
-    is_new_user = register_user(username, password, language);
+    user = register_user(user, username, password, language);
 
-    if (is_new_user == 0) {
+    if (user == NULL) {
       printf("Username already exists, try again.\n");
     } else {
       printf("Welcome, you are now registered!\n");
       printf("Redirecting you to room selection...\n");
 
-      user = malloc(sizeof(*user));
-      if (user == NULL) {
-        fprintf(stderr, "User registration memory allocation failed\n");
-        return NULL;
-      }
-
-      initialize_user_authentication(user, username, password, language);
-
       sleep(1);
     }
-  } while (is_new_user == 0);
+  } while (user == NULL);
 
   return user;
 }
@@ -261,14 +253,6 @@ user *login_phase() {
     } else {
       printf("Welcome, you are now logged in!\n");
       printf("Redirecting you to room selection...\n");
-
-      user = malloc(sizeof(*user));
-      if (user == NULL) {
-        fprintf(stderr, "Memory allocation failed\n");
-        return NULL;
-      }
-
-      initialize_user_authentication(user, username, password, language);
 
       sleep(1);
     }
@@ -390,9 +374,11 @@ int main() {
                  "%s: \033[0;31m%s\033[0m", user->username,
                  "Has been kicked out of the room!");
       } else {
-        snprintf(message_with_user, sizeof(message_with_user), "%s: %s",
-                 user->username, message_buffer);
+        snprintf(message_with_user, sizeof(message_with_user), "%s (%s): %s",
+                 user->username, user->language, message_buffer);
       }
+
+      printf("LANGUAGE: %s\n", user->language);
 
       message_with_user[strcspn(message_with_user, "\n")] = '\0';
 

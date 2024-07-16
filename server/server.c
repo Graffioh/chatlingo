@@ -5,7 +5,6 @@
 #include <errno.h>
 #include <netinet/in.h>
 #include <pthread.h>
-#include <signal.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,49 +46,6 @@ pthread_mutex_t waiting_clients_english_to_italian_mutex =
     PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t waiting_clients_italian_to_english_mutex =
     PTHREAD_MUTEX_INITIALIZER;
-
-void add_client_into_active_list(int socket) {
-  pthread_mutex_lock(&active_clients_mutex);
-  for (int i = 0; i < MAX_CLIENTS; i++) {
-    if (active_client_socket_list[i] == 0) {
-      active_client_socket_list[i] = socket;
-      break;
-    }
-  }
-  pthread_mutex_unlock(&active_clients_mutex);
-}
-
-void remove_client_from_active_list(int socket) {
-  pthread_mutex_lock(&active_clients_mutex);
-  for (int i = 0; i < MAX_CLIENTS; i++) {
-    if (active_client_socket_list[i] == socket) {
-      active_client_socket_list[i] = 0;
-
-      break;
-    }
-  }
-  pthread_mutex_unlock(&active_clients_mutex);
-}
-
-void server_shutdown_handler(int sig) {
-  printf("\nShutting down server...\n");
-
-  pthread_mutex_lock(&active_clients_mutex);
-  for (int i = 0; i < MAX_CLIENTS; i++) {
-    if (active_client_socket_list[i] != 0) {
-      send(active_client_socket_list[i], "SERVER_SHUTDOWN",
-           strlen("SERVER_SHUTDOWN"), 0);
-      close(active_client_socket_list[i]);
-      active_client_socket_list[i] = 0;
-    }
-  }
-  pthread_mutex_unlock(&active_clients_mutex);
-
-  close(server_fd_english_to_italian);
-  close(server_fs_italian_to_english);
-
-  exit(0);
-}
 
 // Translation handling
 //
@@ -591,8 +547,6 @@ int main() {
   server_addr_italian.sin_addr.s_addr = INADDR_ANY;
   server_addr_italian.sin_port = htons(PORT_ITALIAN_TO_ENGLISH);
 
-  signal(SIGINT, server_shutdown_handler);
-
   // Bind the socket to the address
   if (bind(server_fd_english_to_italian,
            (struct sockaddr *)&server_addr_english,
@@ -617,8 +571,9 @@ int main() {
     exit(EXIT_FAILURE);
   }
 
-  printf("TCP Server is listening on ports %d (English to Italian) and %d "
-         "(Italian to English)...\n",
+  printf("TCP Chat Server is listening on ports %d (English to Italian Room) "
+         "and %d "
+         "(Italian to English Room)...\n",
          PORT_ENGLISH_TO_ITALIAN, PORT_ITALIAN_TO_ENGLISH);
 
   vocab *vocabulary = malloc(sizeof(vocab));
