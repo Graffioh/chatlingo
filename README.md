@@ -1,6 +1,6 @@
 # chatlingo
 
-Client-Server chat app implemented with sockets and a TCP connection
+Client-Server chat app implemented with sockets and a TCP connection.
 
 Enter in a room, and chat with others, but there is a catch, based on the room your messages will be translated!
 
@@ -17,4 +17,7 @@ Everything is multi-threaded, so rooms, multiple clients and inactivity detectio
 - Full room queue
 - Inactivity kick
 
+## Demo
+
+https://github.com/user-attachments/assets/1b83271f-7c5d-47d4-9880-f0788c2eefab
 
