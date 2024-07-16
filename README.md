@@ -1,5 +1,7 @@
 # chatlingo
 
+**DISCLAIMER**: This is a toy project
+
 Client-Server chat app implemented with sockets and a TCP connection.
 
 Enter in a room, and chat with others, but there is a catch, based on the room your messages will be translated!
