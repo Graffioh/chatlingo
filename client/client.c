@@ -332,35 +332,6 @@ void login_or_registration_selection(user **user) {
 }
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-// Thread that listen for server shutdown message
-// void *receive_shutdown_message_thread(void *socket_desc) {
-//  int sockfd = *(int *)socket_desc;
-//  char server_shutdown_buffer[BUFSIZE];
-//
-//  while (atomic_load(&is_server_running)) {
-//    memset(server_shutdown_buffer, 0, BUFSIZE);
-//    int bytes_received_shutdown =
-//        recv(sockfd, server_shutdown_buffer, BUFSIZE - 1, 0);
-//    if (bytes_received_shutdown > 0) {
-//      server_shutdown_buffer[bytes_received_shutdown] = '\0';
-//      if (strcmp(server_shutdown_buffer, "SERVER_SHUTDOWN") == 0) {
-//        printf("Server is shutting down. Disconnecting...\n");
-//        atomic_store(&is_server_running, false);
-//        break;
-//      }
-//    } else if (bytes_received_shutdown == 0 ||
-//               (bytes_received_shutdown == -1 && errno != EWOULDBLOCK &&
-//                errno != EAGAIN)) {
-//      printf("Server disconnected.\n");
-//      atomic_store(&is_server_running, false);
-//      break;
-//    }
-//  }
-//
-//  close(sockfd);
-//  return NULL;
-//}
-
 int main() {
   int sockfd;
   char server_response_buffer[BUFSIZE];
@@ -368,15 +339,6 @@ int main() {
   int room_choice;
   user *user = NULL;
 
-  // pthread_t server_shutdown_thread;
-
-  // if (pthread_create(&server_shutdown_thread, NULL,
-  //                    receive_shutdown_message_thread, (void *)&sockfd) < 0) {
-  //   perror("Could not create receive thread");
-  //   close(sockfd);
-  // }
-
-  // while (is_server_running) {
   while (1) {
     // Authentication
     //
@@ -404,6 +366,7 @@ int main() {
     //
     while (atomic_load(&is_in_room) &&
            !atomic_load(&should_kick_inactive_user)) {
+
       // Get user input
       int username_length = strlen(user->username);
       char message_with_user[BUFSIZE + username_length + 4];
@@ -422,12 +385,17 @@ int main() {
 
       update_activity_time();
 
-      snprintf(message_with_user, sizeof(message_with_user), "%s: %s",
-               user->username, message_buffer);
+      if (atomic_load(&should_kick_inactive_user)) {
+        snprintf(message_with_user, sizeof(message_with_user),
+                 "%s: \033[0;31m%s\033[0m", user->username,
+                 "Has been kicked out of the room!");
+      } else {
+        snprintf(message_with_user, sizeof(message_with_user), "%s: %s",
+                 user->username, message_buffer);
+      }
 
       message_with_user[strcspn(message_with_user, "\n")] = '\0';
 
-      // Send message to server
       if (send(sockfd, message_with_user, strlen(message_with_user), 0) < 0) {
         perror("send failed");
         break;
