@@ -21,10 +21,17 @@ Everything is multi-threaded, so rooms, multiple clients and inactivity detectio
 
 ## How to run
 
-To get started
+### Without docker compose
+
 - Run b.sh (it will compile and run the server)
 - Open a new terminal window
 - Run /client/c (as many as you want)
+
+### With docker compose
+
+- Run docker-compose up server
+- Open a new terminal window for every client that you want to connect
+- For every client run docker-compose run client
 
 ## Demo
 

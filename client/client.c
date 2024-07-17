@@ -48,7 +48,6 @@ void *inactivity_check_thread(void *arg) {
   while (atomic_load(&is_in_room)) {
     if (is_inactive(MAX_INACTIVE_TIME_IN_SECONDS)) {
       clear_screen();
-      // system("clear");
       printf("You are now inactive, you are kicked out from the room!!!\n");
       printf("Enter a key to continue\n");
       atomic_store(&should_kick_inactive_user, true);
@@ -137,7 +136,6 @@ int connect_to_server(int room_choice) {
   freeaddrinfo(servinfo);
 
   clear_screen();
-  // system("clear");
 
   printf("Connected to %s room\n",
          room_choice == 1 ? "English to Italian" : "Italian to English");
@@ -155,7 +153,6 @@ int choose_room() {
 
   do {
     clear_screen();
-    // system("clear");
 
     // Display menu
     printf("--- Room selection ---\n");
@@ -309,7 +306,6 @@ void login_or_registration_selection(user **user) {
 
     do {
       clear_screen();
-      // system("clear");
 
       // Display menu
       printf("--- Welcome to Chatlingo ---\n\n");
@@ -483,7 +479,6 @@ int main() {
           // Enter the queue and wait for NOT LOCKED message from the server
           if (exit_choice != 'q') {
             clear_screen();
-            // system("clear");
 
             printf("You are in queue now, wait for your turn...\n");
 
@@ -549,7 +544,6 @@ int main() {
     pthread_join(inactivity_thread, NULL);
 
     clear_screen();
-    // system("clear");
 
     printf("Do you want to choose another room?\n");
     printf("if not you will exit from the chat!\n");
