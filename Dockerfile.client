@@ -1,0 +1,9 @@
+FROM gcc:latest
+
+WORKDIR /
+
+COPY . .
+
+RUN gcc -o ./client/c ./client/client.c ./auth/user_auth.c
+
+CMD ["./client/c"]

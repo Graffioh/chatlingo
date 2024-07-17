@@ -1,0 +1,18 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "8080:8080"
+      - "6969:6969"
+    # used to make printf work
+    stdin_open: true 
+    tty: true
+
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+    depends_on:
+      - server

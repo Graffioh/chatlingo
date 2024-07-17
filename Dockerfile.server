@@ -1,0 +1,9 @@
+FROM gcc:latest
+
+WORKDIR /
+
+COPY . .
+
+RUN gcc -o ./server/s ./server/server.c ./hash_table/hash_table.c ./hash_table/prime.c ./client_queue/client_queue.c -lm
+
+CMD ["./server/s"]

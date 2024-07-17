@@ -1,5 +1,6 @@
 #include <arpa/inet.h>
 #include <errno.h>
+#include <netdb.h>
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdio.h>
@@ -12,6 +13,8 @@
 #include "../auth/user_auth.h"
 
 #define SERVER_IP "127.0.0.1"
+// docker ip
+// #define SERVER_IP "server"
 #define PORT_ENGLISH_TO_ITALIAN 8080
 #define PORT_ITALIAN_TO_ENGLISH 6969
 #define BUFSIZE 1024
@@ -86,34 +89,46 @@ char getch() {
 //
 int connect_to_server(int room_choice) {
   int sockfd;
-  struct sockaddr_in server_addr;
+  struct addrinfo hints, *servinfo, *p;
+  int rv;
+  char port[6];
 
-  // Create socket
-  if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-    perror("socket creation failed");
+  memset(&hints, 0, sizeof hints);
+  hints.ai_family = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
+
+  // Convert port number to string
+  snprintf(port, sizeof(port), "%d",
+           room_choice == 1 ? PORT_ENGLISH_TO_ITALIAN
+                            : PORT_ITALIAN_TO_ENGLISH);
+
+  if ((rv = getaddrinfo(SERVER_IP, port, &hints, &servinfo)) != 0) {
+    fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
     return -1;
   }
 
-  // Set server address
-  memset(&server_addr, 0, sizeof(server_addr));
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_port = htons(room_choice == 1 ? PORT_ENGLISH_TO_ITALIAN
-                                                : PORT_ITALIAN_TO_ENGLISH);
+  // Loop through all the results and connect to the first we can
+  for (p = servinfo; p != NULL; p = p->ai_next) {
+    if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
+      perror("client: socket");
+      continue;
+    }
 
-  // Convert string into IP address format
-  if (inet_pton(AF_INET, SERVER_IP, &server_addr.sin_addr) <= 0) {
-    perror("inet_pton failed");
-    close(sockfd);
+    if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
+      close(sockfd);
+      perror("client: connect");
+      continue;
+    }
+
+    break;
+  }
+
+  if (p == NULL) {
+    fprintf(stderr, "client: failed to connect\n");
     return -1;
   }
 
-  // Connect to the server
-  if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) <
-      0) {
-    perror("connect failed");
-    close(sockfd);
-    return -1;
-  }
+  freeaddrinfo(servinfo); // all done with this structure
 
   system("clear");
 
@@ -132,7 +147,7 @@ int choose_room() {
   enable_raw_mode();
 
   do {
-    system("clear");
+    // system("clear");
 
     // Display menu
     printf("--- Room selection ---\n");
@@ -173,7 +188,15 @@ int choose_room() {
 //
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
+void clear_input_buffer() {
+  int c;
+  while ((c = getchar()) != '\n' && c != EOF)
+    ;
+}
+
 void safe_scanf(char *str, size_t max_len) {
+  clear_input_buffer();
+
   while (1) {
     if (fgets(str, max_len, stdin) != NULL) {
       size_t len = strlen(str);
@@ -181,10 +204,7 @@ void safe_scanf(char *str, size_t max_len) {
         str[len - 1] = '\0';
         break;
       } else {
-        // Clear the input buffer if the input is too long
-        int c;
-        while ((c = getchar()) != '\n' && c != EOF)
-          ;
+        clear_input_buffer();
         printf("STRING TOO LONG!!!, try again.\n");
       }
     } else {
@@ -204,11 +224,14 @@ user *registration_phase() {
 
   do {
     printf("Username: ");
-    safe_scanf(username, sizeof(username));
+    scanf("%s", username);
+    // safe_scanf(username, sizeof(username));
     printf("Password: ");
-    safe_scanf(password, sizeof(password));
+    scanf("%s", password);
+    // safe_scanf(password, sizeof(password));
     printf("Language: ");
-    safe_scanf(language, sizeof(language));
+    scanf("%s", language);
+    // safe_scanf(language, sizeof(language));
 
     user = register_user(user, username, password, language);
 
@@ -235,9 +258,11 @@ user *login_phase() {
 
   do {
     printf("Username: ");
-    safe_scanf(username, sizeof(username));
+    // safe_scanf(username, sizeof(username));
+    scanf("%s", username);
     printf("Password: ");
-    safe_scanf(password, sizeof(password));
+    // safe_scanf(password, sizeof(password));
+    scanf("%s", password);
 
     user = login(username, password);
 
@@ -370,7 +395,14 @@ int main() {
       // Loop till the message is empty or only contains whitespace
       do {
         printf("Enter message: ");
-        safe_scanf(message_buffer, sizeof(message_buffer));
+        // safe_scanf(message_buffer, sizeof(message_buffer));
+        if (fgets(message_buffer, BUFSIZE, stdin) == NULL) {
+          perror("Error reading input");
+          return -1;
+        }
+
+        message_buffer[strcspn(message_buffer, "\n")] = '\0';
+
       } while (strspn(message_buffer, " \t\n\r") == strlen(message_buffer));
 
       update_activity_time();
