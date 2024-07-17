@@ -25,33 +25,31 @@ atomic_bool is_server_running = true;
 
 pthread_t inactivity_thread;
 
-time_t last_activity_time;
+atomic_int_least64_t last_activity_time;
 pthread_mutex_t activity_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+bool is_inactive(int max_inactive_time) {
+  time_t current_time = time(NULL);
+  time_t last_activity = atomic_load(&last_activity_time);
+  return difftime(current_time, last_activity) > max_inactive_time;
+}
 
 // Inactivity thread to listen and act in case of inactivity
 void *inactivity_check_thread(void *arg) {
   while (atomic_load(&is_in_room)) {
-    pthread_mutex_lock(&activity_mutex);
-    time_t current_time = time(NULL);
-    if (difftime(current_time, last_activity_time) >
-        MAX_INACTIVE_TIME_IN_SECONDS) {
+    if (is_inactive(MAX_INACTIVE_TIME_IN_SECONDS)) {
       system("clear");
       printf("You are now inactive, you are kicked out from the room!!!\n");
-      printf("Press a key to continue\n");
+      printf("Enter a key to continue\n");
       atomic_store(&should_kick_inactive_user, true);
     }
-    pthread_mutex_unlock(&activity_mutex);
     sleep(1);
   }
 
   return NULL;
 }
 
-void update_activity_time() {
-  pthread_mutex_lock(&activity_mutex);
-  last_activity_time = time(NULL);
-  pthread_mutex_unlock(&activity_mutex);
-}
+void update_activity_time() { atomic_store(&last_activity_time, time(NULL)); }
 
 // Functions to enable menu arrow selection
 //
@@ -509,6 +507,7 @@ int main() {
 
     atomic_store(&should_kick_inactive_user, false);
     atomic_store(&is_in_room, false);
+    pthread_join(inactivity_thread, NULL);
 
     system("clear");
 
