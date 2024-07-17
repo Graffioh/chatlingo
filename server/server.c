@@ -88,36 +88,29 @@ void first_letter_uppercase(char *str) { str[0] = toupper(str[0]); }
 
 char *reattach_username(char *original_message, char *translated_message) {
   char *username_end = strchr(original_message, ':');
-  if (username_end != NULL) {
-    // Calculate length of username
+  if (username_end) {
     size_t username_len = username_end - original_message;
+    char *final_message = malloc(username_len + strlen(translated_message) + 3);
 
-    // Allocate space for the final message, including the colon and space
-    // between user and message
-    char *final_message = malloc(username_len + strlen(translated_message) +
-                                 3); // +3 for ": " and null terminator
-
-    // Copy username
-    memcpy(final_message, original_message, username_len);
-
-    // Add colon and space
-    final_message[username_len] = ':';
-    final_message[username_len + 1] = ' ';
-
-    // Append translated message
-    strcpy(final_message + username_len + 2, translated_message);
-
-    return final_message;
-  } else {
-    // No username found, return the translated message as-is
-    return translated_message;
+    if (final_message) {
+      snprintf(final_message, username_len + strlen(translated_message) + 3,
+               "%.*s: %s", (int)username_len, original_message,
+               translated_message);
+      return final_message;
+    }
   }
+  return translated_message;
 }
 
 char *translate_phrase(ht_hash_table *dictionary, char *phrase) {
   char *result = malloc(BUFSIZE);
+  if (!result) {
+    return NULL;
+  }
+
   result[0] = '\0';
   char *word = strtok(phrase, " ");
+  size_t result_len = 0;
 
   while (word != NULL) {
     first_letter_uppercase(word);
@@ -127,14 +120,21 @@ char *translate_phrase(ht_hash_table *dictionary, char *phrase) {
       translated_word = word;
     }
 
-    strcat(result, translated_word);
-    strcat(result, " ");
+    int bytes_written = snprintf(result + result_len, BUFSIZE - result_len,
+                                 "%s ", translated_word);
+
+    if (bytes_written > 0) {
+      result_len += bytes_written;
+    } else {
+      break;
+    }
 
     word = strtok(NULL, " ");
   }
 
-  int len = strlen(result);
-  result[len - 1] = '\0';
+  if (result_len < BUFSIZE) {
+    result[result_len - 1] = '\0';
+  }
 
   return result;
 }
@@ -188,7 +188,7 @@ void *handle_client_english_to_italian(void *arg) {
            "\033[0m");
 
     memset(client_english_to_italian_buffer, 0, BUFSIZE);
-    strcpy(client_english_to_italian_buffer, "LOCKED");
+    snprintf(client_english_to_italian_buffer, BUFSIZE, "LOCKED");
 
     // Send the response to the client
     send(client_info->client_socket, client_english_to_italian_buffer,
@@ -217,11 +217,11 @@ void *handle_client_english_to_italian(void *arg) {
              BUFSIZE, 0);
 
     client_english_to_italian_buffer[bytes_received_message] = '\0';
-    // printf("Received from client %s: %s\n", client_ip, buffer);
+    // printf("Received from client: %s\n", client_english_to_italian_buffer);
 
     if (strcmp(client_english_to_italian_buffer, "KICKED") == 0) {
       memset(client_english_to_italian_buffer, 0, BUFSIZE);
-      strcpy(client_english_to_italian_buffer, "NOT LOCKED");
+      snprintf(client_english_to_italian_buffer, BUFSIZE, "NOT LOCKED");
 
       broadcast_message_english_to_italian(client_english_to_italian_buffer,
                                            client_info->client_socket);
@@ -243,10 +243,12 @@ void *handle_client_english_to_italian(void *arg) {
     char *final_message =
         reattach_username(client_english_to_italian_buffer, translated_phrase);
 
+    printf("FINALE MESSAGE: %s\n", final_message);
+
     printf("%s\n", final_message);
 
     memset(client_english_to_italian_buffer, 0, BUFSIZE);
-    strcpy(client_english_to_italian_buffer, final_message);
+    snprintf(client_english_to_italian_buffer, BUFSIZE, "%s", final_message);
 
     // Send the response to the client
     send(client_info->client_socket, client_english_to_italian_buffer,
@@ -257,7 +259,7 @@ void *handle_client_english_to_italian(void *arg) {
     if (strcmp(message_without_user, "/ciao") == 0 ||
         strcmp(message_without_user, "/exit") == 0) {
       memset(client_english_to_italian_buffer, 0, BUFSIZE);
-      strcpy(client_english_to_italian_buffer, "NOT LOCKED");
+      snprintf(client_english_to_italian_buffer, BUFSIZE, "NOT LOCKED");
 
       broadcast_message_english_to_italian(client_english_to_italian_buffer,
                                            client_info->client_socket);
@@ -290,7 +292,7 @@ void *handle_client_italian_to_english(void *arg) {
     pthread_mutex_unlock(&waiting_clients_italian_to_english_mutex);
 
     memset(client_italian_to_english_buffer, 0, BUFSIZE);
-    strcpy(client_italian_to_english_buffer, "LOCKED");
+    snprintf(client_italian_to_english_buffer, BUFSIZE, "LOCKED");
 
     // Send the response to the client
     send(client_info->client_socket, client_italian_to_english_buffer,
@@ -323,7 +325,7 @@ void *handle_client_italian_to_english(void *arg) {
 
     if (strcmp(client_italian_to_english_buffer, "KICKED") == 0) {
       memset(client_italian_to_english_buffer, 0, BUFSIZE);
-      strcpy(client_italian_to_english_buffer, "NOT LOCKED");
+      snprintf(client_italian_to_english_buffer, BUFSIZE, "NOT LOCKED");
 
       broadcast_message_english_to_italian(client_italian_to_english_buffer,
                                            client_info->client_socket);
@@ -348,7 +350,7 @@ void *handle_client_italian_to_english(void *arg) {
     printf("%s\n", final_message);
 
     memset(client_italian_to_english_buffer, 0, BUFSIZE);
-    strcpy(client_italian_to_english_buffer, final_message);
+    snprintf(client_italian_to_english_buffer, BUFSIZE, "%s", final_message);
 
     // Send the response to the client
     send(client_info->client_socket, final_message, strlen(final_message), 0);
@@ -358,7 +360,7 @@ void *handle_client_italian_to_english(void *arg) {
     if (strcmp(message_without_user, "/ciao") == 0 ||
         strcmp(message_without_user, "/exit") == 0) {
       memset(client_italian_to_english_buffer, 0, BUFSIZE);
-      strcpy(client_italian_to_english_buffer, "NOT LOCKED");
+      snprintf(client_italian_to_english_buffer, BUFSIZE, "NOT LOCKED");
 
       broadcast_message_italian_to_english(client_italian_to_english_buffer,
                                            client_info->client_socket);
