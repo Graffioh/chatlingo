@@ -27,25 +27,18 @@ typedef struct {
   ht_hash_table *italian_to_english;
 } vocab;
 
-int active_client_socket_list[MAX_CLIENTS] = {0};
-pthread_mutex_t active_clients_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-atomic_int active_english_to_italian_clients = 0;
-atomic_int active_italian_to_english_clients = 0;
-pthread_mutex_t client_english_to_italian_count_mutex =
-    PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t client_italian_to_english_count_mutex =
-    PTHREAD_MUTEX_INITIALIZER;
-
 int server_fd_english_to_italian, server_fs_italian_to_english;
 
-client_queue *waiting_client_queue_english_to_italian;
-client_queue *waiting_client_queue_italian_to_english;
+atomic_int waiting_english_to_italian_clients = 0;
+atomic_int waiting_italian_to_english_clients = 0;
 
 pthread_mutex_t waiting_clients_english_to_italian_mutex =
     PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t waiting_clients_italian_to_english_mutex =
     PTHREAD_MUTEX_INITIALIZER;
+
+client_queue *waiting_client_queue_english_to_italian;
+client_queue *waiting_client_queue_italian_to_english;
 
 // Translation handling
 //
@@ -177,7 +170,7 @@ void *handle_client_english_to_italian(void *arg) {
   char client_english_to_italian_buffer[BUFSIZE];
   clientinfo *client_info = (clientinfo *)arg;
 
-  if (active_english_to_italian_clients >= MAX_USERS_PER_ROOM) {
+  if (atomic_load(&waiting_english_to_italian_clients) >= MAX_USERS_PER_ROOM) {
     pthread_mutex_lock(&waiting_clients_english_to_italian_mutex);
     client_enqueue(waiting_client_queue_english_to_italian,
                    client_info->client_socket);
@@ -204,9 +197,7 @@ void *handle_client_english_to_italian(void *arg) {
   }
   pthread_mutex_unlock(&waiting_clients_english_to_italian_mutex);
 
-  pthread_mutex_lock(&client_english_to_italian_count_mutex);
-  active_english_to_italian_clients++;
-  pthread_mutex_unlock(&client_english_to_italian_count_mutex);
+  atomic_fetch_add(&waiting_english_to_italian_clients, 1);
 
   while (1) {
     memset(client_english_to_italian_buffer, 0, BUFSIZE);
@@ -243,8 +234,6 @@ void *handle_client_english_to_italian(void *arg) {
     char *final_message =
         reattach_username(client_english_to_italian_buffer, translated_phrase);
 
-    printf("FINALE MESSAGE: %s\n", final_message);
-
     printf("%s\n", final_message);
 
     memset(client_english_to_italian_buffer, 0, BUFSIZE);
@@ -269,10 +258,9 @@ void *handle_client_english_to_italian(void *arg) {
   }
 
   close(client_info->client_socket);
+  free(client_info);
 
-  pthread_mutex_lock(&client_english_to_italian_count_mutex);
-  active_english_to_italian_clients--;
-  pthread_mutex_unlock(&client_english_to_italian_count_mutex);
+  atomic_fetch_sub(&waiting_english_to_italian_clients, 1);
 
   return NULL;
 }
@@ -281,7 +269,7 @@ void *handle_client_italian_to_english(void *arg) {
   char client_italian_to_english_buffer[BUFSIZE];
   clientinfo *client_info = (clientinfo *)arg;
 
-  if (active_italian_to_english_clients == MAX_USERS_PER_ROOM) {
+  if (atomic_load(&waiting_italian_to_english_clients) == MAX_USERS_PER_ROOM) {
     printf("\033[33m"
            "A user tried to enter the room, but it's full...\n"
            "\033[0m");
@@ -308,9 +296,7 @@ void *handle_client_italian_to_english(void *arg) {
   }
   pthread_mutex_unlock(&waiting_clients_italian_to_english_mutex);
 
-  pthread_mutex_lock(&client_italian_to_english_count_mutex);
-  active_italian_to_english_clients++;
-  pthread_mutex_unlock(&client_italian_to_english_count_mutex);
+  atomic_fetch_add(&waiting_italian_to_english_clients, 1);
 
   while (1) {
     memset(client_italian_to_english_buffer, 0, BUFSIZE);
@@ -321,7 +307,7 @@ void *handle_client_italian_to_english(void *arg) {
              BUFSIZE, 0);
 
     client_italian_to_english_buffer[bytes_received_message] = '\0';
-    // printf("Received from client %s: %s\n", client_ip, buffer);
+    // printf("Received from client: %s\n", client_italian_to_english_buffer);
 
     if (strcmp(client_italian_to_english_buffer, "KICKED") == 0) {
       memset(client_italian_to_english_buffer, 0, BUFSIZE);
@@ -347,6 +333,7 @@ void *handle_client_italian_to_english(void *arg) {
     char *final_message =
         reattach_username(client_italian_to_english_buffer, translated_phrase);
 
+    // Print the message on screen (server)
     printf("%s\n", final_message);
 
     memset(client_italian_to_english_buffer, 0, BUFSIZE);
@@ -370,10 +357,9 @@ void *handle_client_italian_to_english(void *arg) {
   }
 
   close(client_info->client_socket);
+  free(client_info);
 
-  pthread_mutex_lock(&client_italian_to_english_count_mutex);
-  active_italian_to_english_clients--;
-  pthread_mutex_unlock(&client_italian_to_english_count_mutex);
+  atomic_fetch_sub(&waiting_italian_to_english_clients, 1);
 
   return NULL;
 }
@@ -480,6 +466,8 @@ void *room_italian_to_english(void *arg) {
       continue;
     }
 
+    free(client_info);
+
     pthread_detach(client_thread);
   }
 
@@ -521,7 +509,6 @@ int main() {
 
   struct sockaddr_in server_addr_english, server_addr_italian;
 
-  // Create socket
   if ((server_fd_english_to_italian = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
     perror("socket failed for English to Italian");
     exit(EXIT_FAILURE);
@@ -544,7 +531,6 @@ int main() {
     exit(EXIT_FAILURE);
   }
 
-  // Set server address
   server_addr_english.sin_family = AF_INET;
   server_addr_english.sin_addr.s_addr = INADDR_ANY;
   server_addr_english.sin_port = htons(PORT_ENGLISH_TO_ITALIAN);
@@ -553,7 +539,6 @@ int main() {
   server_addr_italian.sin_addr.s_addr = INADDR_ANY;
   server_addr_italian.sin_port = htons(PORT_ITALIAN_TO_ENGLISH);
 
-  // Bind the socket to the address
   if (bind(server_fd_english_to_italian,
            (struct sockaddr *)&server_addr_english,
            sizeof(server_addr_english)) < 0) {
@@ -567,7 +552,6 @@ int main() {
     exit(EXIT_FAILURE);
   }
 
-  // Listen for incoming connections
   if (listen(server_fd_english_to_italian, 3) < 0) {
     perror("listen failed for English to Italian");
     exit(EXIT_FAILURE);
@@ -586,8 +570,7 @@ int main() {
   printf("---------------------------------------------------------------------"
          "----------------------------------\n");
 
-  vocab *vocabulary = malloc(sizeof(vocab));
-  vocabulary = vocab_setup_from_txt();
+  vocab *vocabulary = vocab_setup_from_txt();
 
   room_creation(vocabulary);
 
