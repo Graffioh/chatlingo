@@ -147,7 +147,7 @@ int choose_room() {
   enable_raw_mode();
 
   do {
-    // system("clear");
+    system("clear");
 
     // Display menu
     printf("--- Room selection ---\n");
@@ -188,15 +188,8 @@ int choose_room() {
 //
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
-void clear_input_buffer() {
-  int c;
-  while ((c = getchar()) != '\n' && c != EOF)
-    ;
-}
 
 void safe_scanf(char *str, size_t max_len) {
-  clear_input_buffer();
-
   while (1) {
     if (fgets(str, max_len, stdin) != NULL) {
       size_t len = strlen(str);
@@ -204,11 +197,14 @@ void safe_scanf(char *str, size_t max_len) {
         str[len - 1] = '\0';
         break;
       } else {
-        clear_input_buffer();
+        int c;
+        while ((c = getchar()) != '\n' && c != EOF) {
+        }
         printf("STRING TOO LONG!!!, try again.\n");
       }
     } else {
       printf("INPUT ERROR!!!\n");
+      str[0] = '\0';
       break;
     }
   }
@@ -224,14 +220,14 @@ user *registration_phase() {
 
   do {
     printf("Username: ");
-    scanf("%s", username);
-    // safe_scanf(username, sizeof(username));
+    // scanf("%s", username);
+    safe_scanf(username, sizeof(username));
     printf("Password: ");
-    scanf("%s", password);
-    // safe_scanf(password, sizeof(password));
+    // scanf("%s", password);
+    safe_scanf(password, sizeof(password));
     printf("Language: ");
-    scanf("%s", language);
-    // safe_scanf(language, sizeof(language));
+    // scanf("%s", language);
+    safe_scanf(language, sizeof(language));
 
     user = register_user(user, username, password, language);
 
@@ -258,11 +254,11 @@ user *login_phase() {
 
   do {
     printf("Username: ");
-    // safe_scanf(username, sizeof(username));
-    scanf("%s", username);
+    safe_scanf(username, sizeof(username));
+    // scanf("%s", username);
     printf("Password: ");
-    // safe_scanf(password, sizeof(password));
-    scanf("%s", password);
+    safe_scanf(password, sizeof(password));
+    // scanf("%s", password);
 
     user = login(username, password);
 
@@ -395,13 +391,13 @@ int main() {
       // Loop till the message is empty or only contains whitespace
       do {
         printf("Enter message: ");
-        // safe_scanf(message_buffer, sizeof(message_buffer));
-        if (fgets(message_buffer, BUFSIZE, stdin) == NULL) {
-          perror("Error reading input");
-          return -1;
-        }
+        safe_scanf(message_buffer, sizeof(message_buffer));
+        //   if (fgets(message_buffer, BUFSIZE, stdin) == NULL) {
+        //     perror("Error reading input");
+        //     return -1;
+        //   }
 
-        message_buffer[strcspn(message_buffer, "\n")] = '\0';
+        //   message_buffer[strcspn(message_buffer, "\n")] = '\0';
 
       } while (strspn(message_buffer, " \t\n\r") == strlen(message_buffer));
 
