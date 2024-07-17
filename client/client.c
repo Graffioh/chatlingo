@@ -31,6 +31,12 @@ pthread_t inactivity_thread;
 atomic_int_least64_t last_activity_time;
 pthread_mutex_t activity_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+// Instead of system("clear") use this
+void clear_screen() {
+  const char *CLEAR_SCREEN_ANSI = "\033[2J\033[H";
+  write(STDOUT_FILENO, CLEAR_SCREEN_ANSI, 7);
+}
+
 bool is_inactive(int max_inactive_time) {
   time_t current_time = time(NULL);
   time_t last_activity = atomic_load(&last_activity_time);
@@ -41,7 +47,8 @@ bool is_inactive(int max_inactive_time) {
 void *inactivity_check_thread(void *arg) {
   while (atomic_load(&is_in_room)) {
     if (is_inactive(MAX_INACTIVE_TIME_IN_SECONDS)) {
-      system("clear");
+      clear_screen();
+      // system("clear");
       printf("You are now inactive, you are kicked out from the room!!!\n");
       printf("Enter a key to continue\n");
       atomic_store(&should_kick_inactive_user, true);
@@ -57,7 +64,6 @@ void update_activity_time() { atomic_store(&last_activity_time, time(NULL)); }
 // Functions to enable menu arrow selection
 //
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++
-//
 // Configure terminal for single character input
 void enable_raw_mode() {
   struct termios term;
@@ -128,9 +134,10 @@ int connect_to_server(int room_choice) {
     return -1;
   }
 
-  freeaddrinfo(servinfo); // all done with this structure
+  freeaddrinfo(servinfo);
 
-  system("clear");
+  clear_screen();
+  // system("clear");
 
   printf("Connected to %s room\n",
          room_choice == 1 ? "English to Italian" : "Italian to English");
@@ -147,7 +154,8 @@ int choose_room() {
   enable_raw_mode();
 
   do {
-    system("clear");
+    clear_screen();
+    // system("clear");
 
     // Display menu
     printf("--- Room selection ---\n");
@@ -300,7 +308,8 @@ void login_or_registration_selection(user **user) {
     enable_raw_mode();
 
     do {
-      system("clear");
+      clear_screen();
+      // system("clear");
 
       // Display menu
       printf("--- Welcome to Chatlingo ---\n\n");
@@ -473,7 +482,9 @@ int main() {
 
           // Enter the queue and wait for NOT LOCKED message from the server
           if (exit_choice != 'q') {
-            system("clear");
+            clear_screen();
+            // system("clear");
+
             printf("You are in queue now, wait for your turn...\n");
 
             memset(server_response_buffer, 0, BUFSIZE);
@@ -537,7 +548,8 @@ int main() {
     atomic_store(&is_in_room, false);
     pthread_join(inactivity_thread, NULL);
 
-    system("clear");
+    clear_screen();
+    // system("clear");
 
     printf("Do you want to choose another room?\n");
     printf("if not you will exit from the chat!\n");
