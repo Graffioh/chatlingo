@@ -29,7 +29,6 @@ atomic_bool is_server_running = true;
 pthread_t inactivity_thread;
 
 atomic_int_least64_t last_activity_time;
-pthread_mutex_t activity_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // Instead of system("clear") use this
 void clear_screen() {
