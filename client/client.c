@@ -175,6 +175,27 @@ int choose_room() {
 //
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
+void safe_scanf(char *str, size_t max_len) {
+  while (1) {
+    if (fgets(str, max_len, stdin) != NULL) {
+      size_t len = strlen(str);
+      if (len > 0 && str[len - 1] == '\n') {
+        str[len - 1] = '\0';
+        break;
+      } else {
+        // Clear the input buffer if the input is too long
+        int c;
+        while ((c = getchar()) != '\n' && c != EOF)
+          ;
+        printf("STRING TOO LONG!!!, try again.\n");
+      }
+    } else {
+      printf("INPUT ERROR!!!\n");
+      break;
+    }
+  }
+}
+
 user *registration_phase() {
   char username[MAX_USERNAME_LENGTH], password[MAX_PASSWORD_LENGTH],
       language[MAX_LANGUAGE_LENGTH];
@@ -185,11 +206,11 @@ user *registration_phase() {
 
   do {
     printf("Username: ");
-    scanf("%s", username);
+    safe_scanf(username, sizeof(username));
     printf("Password: ");
-    scanf("%s", password);
+    safe_scanf(password, sizeof(password));
     printf("Language: ");
-    scanf("%s", language);
+    safe_scanf(language, sizeof(language));
 
     user = register_user(user, username, password, language);
 
@@ -216,9 +237,9 @@ user *login_phase() {
 
   do {
     printf("Username: ");
-    scanf("%s", username);
+    safe_scanf(username, sizeof(username));
     printf("Password: ");
-    scanf("%s", password);
+    safe_scanf(password, sizeof(password));
 
     user = login(username, password);
 
@@ -331,7 +352,9 @@ int main() {
     }
 
     atomic_store(&is_in_room, true);
-    last_activity_time = time(NULL);
+
+    update_activity_time();
+
     if (pthread_create(&inactivity_thread, NULL, inactivity_check_thread,
                        NULL) != 0) {
       perror("Failed to create inactivity check thread");
@@ -349,13 +372,7 @@ int main() {
       // Loop till the message is empty or only contains whitespace
       do {
         printf("Enter message: ");
-        if (fgets(message_buffer, BUFSIZE, stdin) == NULL) {
-          perror("Error reading input");
-          return -1;
-        }
-
-        message_buffer[strcspn(message_buffer, "\n")] = '\0';
-
+        safe_scanf(message_buffer, sizeof(message_buffer));
       } while (strspn(message_buffer, " \t\n\r") == strlen(message_buffer));
 
       update_activity_time();
@@ -455,7 +472,9 @@ int main() {
               sockfd = connect_to_server(room_choice);
 
               atomic_store(&is_in_room, true);
-              last_activity_time = time(NULL);
+
+              update_activity_time();
+
               if (pthread_create(&inactivity_thread, NULL,
                                  inactivity_check_thread, NULL) != 0) {
                 perror("Failed to create inactivity check thread");
