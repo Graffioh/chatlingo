@@ -12,9 +12,12 @@
 
 #include "../auth/user_auth.h"
 
+// Local ip to uncomment if using local dev environment
 #define SERVER_IP "127.0.0.1"
-// docker ip
+
+// Docker ip to uncomment if using docker
 // #define SERVER_IP "server"
+
 #define PORT_ENGLISH_TO_ITALIAN 8080
 #define PORT_ITALIAN_TO_ENGLISH 6969
 #define BUFSIZE 1024
@@ -27,7 +30,6 @@ atomic_bool should_kick_inactive_user = false;
 atomic_bool is_server_running = true;
 
 pthread_t inactivity_thread;
-
 atomic_int_least64_t last_activity_time;
 
 // Instead of system("clear") use this
@@ -36,6 +38,10 @@ void clear_screen() {
   write(STDOUT_FILENO, CLEAR_SCREEN_ANSI, 7);
 }
 
+// Inactivity mechanism
+//
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
 bool is_inactive(int max_inactive_time) {
   time_t current_time = time(NULL);
   time_t last_activity = atomic_load(&last_activity_time);
@@ -58,10 +64,12 @@ void *inactivity_check_thread(void *arg) {
 }
 
 void update_activity_time() { atomic_store(&last_activity_time, time(NULL)); }
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 // Functions to enable menu arrow selection
 //
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
 // Configure terminal for single character input
 void enable_raw_mode() {
   struct termios term;
@@ -101,11 +109,11 @@ int connect_to_server(int room_choice) {
   hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;
 
-  // Convert port number to string
   snprintf(port, sizeof(port), "%d",
            room_choice == 1 ? PORT_ENGLISH_TO_ITALIAN
                             : PORT_ITALIAN_TO_ENGLISH);
 
+  // All of this is because of docker "ip"
   if ((rv = getaddrinfo(SERVER_IP, port, &hints, &servinfo)) != 0) {
     printf("getaddrinfo: %s\n", gai_strerror(rv));
     return -1;
@@ -224,13 +232,10 @@ user *registration_phase() {
 
   do {
     printf("Username: ");
-    // scanf("%s", username);
     safe_scanf(username, sizeof(username));
     printf("Password: ");
-    // scanf("%s", password);
     safe_scanf(password, sizeof(password));
     printf("Language: ");
-    // scanf("%s", language);
     safe_scanf(language, sizeof(language));
 
     user = register_user(user, username, password, language);
@@ -261,10 +266,8 @@ user *login_phase() {
   do {
     printf("Username: ");
     safe_scanf(username, sizeof(username));
-    // scanf("%s", username);
     printf("Password: ");
     safe_scanf(password, sizeof(password));
-    // scanf("%s", password);
 
     user = login(username, password);
 
@@ -401,13 +404,6 @@ int main() {
       do {
         printf("Enter message: ");
         safe_scanf(message_buffer, sizeof(message_buffer));
-        //   if (fgets(message_buffer, BUFSIZE, stdin) == NULL) {
-        //     perror("Error reading input");
-        //     return -1;
-        //   }
-
-        //   message_buffer[strcspn(message_buffer, "\n")] = '\0';
-
       } while (strspn(message_buffer, " \t\n\r") == strlen(message_buffer));
 
       update_activity_time();
