@@ -19,7 +19,7 @@
 #define PORT_ITALIAN_TO_ENGLISH 6969
 #define BUFSIZE 1024
 #define MAX_LENGTH 1000
-#define MAX_USERS_PER_ROOM 2
+#define MAX_USERS_PER_ROOM 1
 #define MAX_CLIENTS 50
 
 typedef struct {
@@ -561,14 +561,15 @@ int main() {
     exit(EXIT_FAILURE);
   }
 
+  printf("\033[0;36m");
   printf("---------------------------------------------------------------------"
-         "----------------------------------\n");
+         "-----------------------------------\n");
   printf("TCP Chat Server is listening on ports %d (English to Italian Room) "
-         "and %d "
-         "(Italian to English Room)\n",
+         "and %d (Italian to English Room)\n",
          PORT_ENGLISH_TO_ITALIAN, PORT_ITALIAN_TO_ENGLISH);
   printf("---------------------------------------------------------------------"
-         "----------------------------------\n");
+         "-----------------------------------\n");
+  printf("\033[0m");
 
   vocab *vocabulary = vocab_setup_from_txt();
 

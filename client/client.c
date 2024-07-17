@@ -107,7 +107,7 @@ int connect_to_server(int room_choice) {
                             : PORT_ITALIAN_TO_ENGLISH);
 
   if ((rv = getaddrinfo(SERVER_IP, port, &hints, &servinfo)) != 0) {
-    fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+    printf("getaddrinfo: %s\n", gai_strerror(rv));
     return -1;
   }
 
@@ -128,7 +128,7 @@ int connect_to_server(int room_choice) {
   }
 
   if (p == NULL) {
-    fprintf(stderr, "client: failed to connect\n");
+    printf("\033[0;31m%s\033[0m", "No server found.\n");
     return -1;
   }
 
@@ -151,7 +151,7 @@ int choose_room() {
   enable_raw_mode();
 
   do {
-    clear_screen();
+    // clear_screen();
 
     // Display menu
     printf("--- Room selection ---\n");
@@ -245,6 +245,8 @@ user *registration_phase() {
     }
   } while (user == NULL);
 
+  clear_screen();
+
   return user;
 }
 
@@ -292,6 +294,8 @@ user *login_phase() {
       sleep(1);
     }
   } while (login_choice == 1 && user == NULL);
+
+  clear_screen();
 
   return user;
 }
@@ -352,7 +356,7 @@ void login_or_registration_selection(user **user) {
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 int main() {
-  int sockfd;
+  int sockfd = -1;
   char server_response_buffer[BUFSIZE];
   char message_buffer[BUFSIZE];
   int room_choice;
@@ -365,14 +369,15 @@ int main() {
 
     // Room choice
     //
-    room_choice = choose_room();
-    fflush(stdin);
-    sockfd = connect_to_server(room_choice);
+    do {
+      room_choice = choose_room();
+      fflush(stdin);
+      sockfd = connect_to_server(room_choice);
 
-    if (sockfd < 0) {
-      printf("Failed to connect. Try again.\n");
-      continue;
-    }
+      if (sockfd < 0) {
+        printf("Failed to connect. Try again.\n");
+      }
+    } while (sockfd < 0);
 
     atomic_store(&is_in_room, true);
 
@@ -427,8 +432,7 @@ int main() {
       // selection
       if (strcmp(message_buffer, "/ciao") == 0 ||
           strcmp(message_buffer, "/exit") == 0) {
-        printf("Disconnecting from current room. Sending you back to room "
-               "selection...\n");
+        printf("Disconnecting from current room...\n");
 
         atomic_store(&is_in_room, false);
         pthread_join(inactivity_thread, NULL);

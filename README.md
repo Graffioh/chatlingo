@@ -16,8 +16,7 @@ Everything is multi-threaded, so rooms, multiple clients and inactivity detectio
 
 - User authentication
 - 2 Chat rooms (English -> Italian and viceversa)
-- Full room queue
-- Inactivity kick
+- Full room queue and inactivity kick with FIFO order
 
 ## How to run
 
