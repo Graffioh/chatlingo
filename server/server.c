@@ -27,7 +27,7 @@ typedef struct {
   ht_hash_table *italian_to_english;
 } vocab;
 
-int server_fd_english_to_italian, server_fs_italian_to_english;
+int server_fd_english_to_italian, server_fd_italian_to_english;
 
 atomic_int waiting_english_to_italian_clients = 0;
 atomic_int waiting_italian_to_english_clients = 0;
@@ -269,15 +269,15 @@ void *handle_client_italian_to_english(void *arg) {
   char client_italian_to_english_buffer[BUFSIZE];
   clientinfo *client_info = (clientinfo *)arg;
 
-  if (atomic_load(&waiting_italian_to_english_clients) == MAX_USERS_PER_ROOM) {
-    printf("\033[33m"
-           "A user tried to enter the room, but it's full...\n"
-           "\033[0m");
-
+  if (atomic_load(&waiting_italian_to_english_clients) >= MAX_USERS_PER_ROOM) {
     pthread_mutex_lock(&waiting_clients_italian_to_english_mutex);
     client_enqueue(waiting_client_queue_italian_to_english,
                    client_info->client_socket);
     pthread_mutex_unlock(&waiting_clients_italian_to_english_mutex);
+
+    printf("\033[33m"
+           "A user tried to enter the room, but it's full...\n"
+           "\033[0m");
 
     memset(client_italian_to_english_buffer, 0, BUFSIZE);
     snprintf(client_italian_to_english_buffer, BUFSIZE, "LOCKED");
@@ -313,7 +313,7 @@ void *handle_client_italian_to_english(void *arg) {
       memset(client_italian_to_english_buffer, 0, BUFSIZE);
       snprintf(client_italian_to_english_buffer, BUFSIZE, "NOT LOCKED");
 
-      broadcast_message_english_to_italian(client_italian_to_english_buffer,
+      broadcast_message_italian_to_english(client_italian_to_english_buffer,
                                            client_info->client_socket);
 
       break;
@@ -340,7 +340,8 @@ void *handle_client_italian_to_english(void *arg) {
     snprintf(client_italian_to_english_buffer, BUFSIZE, "%s", final_message);
 
     // Send the response to the client
-    send(client_info->client_socket, final_message, strlen(final_message), 0);
+    send(client_info->client_socket, client_italian_to_english_buffer,
+         strlen(client_italian_to_english_buffer), 0);
     free(translated_phrase);
     free(final_message);
 
@@ -440,14 +441,14 @@ void *room_italian_to_english(void *arg) {
 
   while (1) {
     // Accept a new connection
-    if ((client_socket = accept(server_fs_italian_to_english,
+    if ((client_socket = accept(server_fd_italian_to_english,
                                 (struct sockaddr *)&client_addr, &addr_len)) <
         0) {
       if (errno == EINTR || errno == ECONNABORTED) {
         continue;
       } else {
         perror("accept failed");
-        close(server_fd_english_to_italian);
+        close(server_fd_italian_to_english);
         exit(EXIT_FAILURE);
       }
       continue;
@@ -512,7 +513,7 @@ int main() {
     perror("socket failed for English to Italian");
     exit(EXIT_FAILURE);
   }
-  if ((server_fs_italian_to_english = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+  if ((server_fd_italian_to_english = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
     perror("socket failed for Italian to English");
     exit(EXIT_FAILURE);
   }
@@ -524,7 +525,7 @@ int main() {
     perror("setsockopt failed for English to Italian");
     exit(EXIT_FAILURE);
   }
-  if (setsockopt(server_fs_italian_to_english, SOL_SOCKET, SO_REUSEADDR, &opt,
+  if (setsockopt(server_fd_italian_to_english, SOL_SOCKET, SO_REUSEADDR, &opt,
                  sizeof(opt)) < 0) {
     perror("setsockopt failed for Italian to English");
     exit(EXIT_FAILURE);
@@ -544,7 +545,7 @@ int main() {
     perror("bind failed for English to Italian");
     exit(EXIT_FAILURE);
   }
-  if (bind(server_fs_italian_to_english,
+  if (bind(server_fd_italian_to_english,
            (struct sockaddr *)&server_addr_italian,
            sizeof(server_addr_italian)) < 0) {
     perror("bind failed for Italian to English");
@@ -555,7 +556,7 @@ int main() {
     perror("listen failed for English to Italian");
     exit(EXIT_FAILURE);
   }
-  if (listen(server_fs_italian_to_english, 3) < 0) {
+  if (listen(server_fd_italian_to_english, 3) < 0) {
     perror("listen failed for Italian to English");
     exit(EXIT_FAILURE);
   }
@@ -579,6 +580,6 @@ int main() {
   free(vocabulary);
 
   close(server_fd_english_to_italian);
-  close(server_fs_italian_to_english);
+  close(server_fd_italian_to_english);
   return 0;
 }
