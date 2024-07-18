@@ -27,10 +27,9 @@
 
 atomic_bool is_in_room = false;
 atomic_bool should_kick_inactive_user = false;
-atomic_bool is_server_running = true;
+atomic_int_least64_t last_activity_time;
 
 pthread_t inactivity_thread;
-atomic_int_least64_t last_activity_time;
 
 // Instead of system("clear") use this
 void clear_screen() {
