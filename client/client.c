@@ -38,6 +38,12 @@ void clear_screen() {
   write(STDOUT_FILENO, CLEAR_SCREEN_ANSI, 7);
 }
 
+void good_fflush() {
+  int c;
+  while ((c = getchar()) != '\n' && c != EOF) {
+  }
+}
+
 // Inactivity mechanism
 //
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -211,9 +217,7 @@ void safe_scanf(char *str, size_t max_len) {
         str[len - 1] = '\0';
         break;
       } else {
-        int c;
-        while ((c = getchar()) != '\n' && c != EOF) {
-        }
+        good_fflush();
         printf("STRING TOO LONG!!!, try again.\n");
       }
     } else {
@@ -277,6 +281,8 @@ user *login_phase() {
       printf("User not present in the database, you need to register.\n");
       printf("Do you want try again (1) or you want to register (2)? ");
       scanf("%d", &login_choice);
+
+      good_fflush();
 
       switch (login_choice) {
       case 1:
@@ -474,8 +480,10 @@ int main() {
         char exit_choice;
         do {
           printf("What you want to do? \n");
-          scanf(" %c", &exit_choice);
-          getchar();
+          scanf("%c", &exit_choice);
+          // getchar();
+
+          good_fflush();
 
           // Enter the queue and wait for NOT LOCKED message from the server
           if (exit_choice != 'q') {
@@ -550,8 +558,9 @@ int main() {
     printf("if not you will exit from the chat!\n");
     printf("(y/n): ");
     char choice;
-    scanf(" %c", &choice);
-    getchar();
+    scanf("%c", &choice);
+
+    good_fflush();
 
     if (choice != 'y' && choice != 'Y') {
       sleep(1);
