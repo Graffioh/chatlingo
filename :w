@@ -365,7 +365,7 @@ void *handle_client_italian_to_english(void *arg) {
 }
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-void print_welcome_message(int client_socket, int room_type) {
+void print_welcome_message(int client_socket) {
   struct sockaddr_in client_addr;
   socklen_t addr_len = sizeof(client_addr);
   getpeername(client_socket, (struct sockaddr *)&client_addr, &addr_len);
@@ -373,8 +373,7 @@ void print_welcome_message(int client_socket, int room_type) {
   time_t now = time(NULL);
   strftime(timestamp, 20, "%Y-%m-%d %H:%M:%S", localtime(&now));
 
-  printf("[%s] New client connected %s: %s:%d\n", timestamp,
-         room_type == 1 ? "(English to Italian)" : "(Italian to English)",
+  printf("[%s] New client connected (English to Italian): %s:%d\n", timestamp,
          inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 }
 
@@ -408,7 +407,7 @@ void *room_english_to_italian(void *arg) {
       continue;
     }
 
-    print_welcome_message(client_socket, 1);
+    print_welcome_message(client_socket);
 
     clientinfo *client_info = malloc(sizeof(clientinfo));
     client_info->client_socket = client_socket;
@@ -453,7 +452,7 @@ void *room_italian_to_english(void *arg) {
       continue;
     }
 
-    print_welcome_message(client_socket, 2);
+    print_welcome_message(client_socket);
 
     clientinfo *client_info = malloc(sizeof(clientinfo));
     client_info->client_socket = client_socket;
@@ -466,6 +465,8 @@ void *room_italian_to_english(void *arg) {
       close(client_socket);
       continue;
     }
+
+    free(client_info);
 
     pthread_detach(client_thread);
   }

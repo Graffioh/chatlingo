@@ -192,6 +192,8 @@ int choose_room() {
       disable_raw_mode();
       return selected;
     }
+
+    clear_screen();
   } while (1);
 }
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++
